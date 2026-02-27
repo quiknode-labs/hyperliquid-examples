@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# TypeScript/Node
+node_modules/
+
+# Rust
+target/
+
+# Environment
+.env
+.env.local
+*.pem
+
+# OS
+.DS_Store
