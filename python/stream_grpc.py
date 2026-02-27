@@ -179,49 +179,39 @@ def stream_l4_book_example():
         nonlocal update_count
         update_count += 1
 
-        # L4 book structure differs from L2:
-        # Each level may have multiple individual orders
+        # L4 data has two types: "snapshot" or "diff"
+        update_type = data.get("type", "unknown")
         coin = data.get("coin", "BTC")
         bids = data.get("bids", [])
         asks = data.get("asks", [])
 
-        print(f"[{timestamp()}] {coin} L4 Book Update #{update_count}:")
+        print(f"[{timestamp()}] {coin} L4 Book ({update_type}) #{update_count}:")
 
-        # Show top 3 bid levels with individual orders
-        print("  TOP BIDS:")
-        for i, bid in enumerate(bids[:3]):
-            # Each bid: [price, size, oid] or [price, [[size, oid], ...]]
-            if isinstance(bid, list):
-                if len(bid) >= 3:
-                    # Single order format: [px, sz, oid]
-                    px, sz, oid = bid[0], bid[1], bid[2]
-                    print(f"    [{i+1}] ${float(px):,.2f} x {sz} (order: {oid})")
-                elif len(bid) >= 2 and isinstance(bid[1], list):
-                    # Multiple orders at price: [px, [[sz, oid], [sz, oid], ...]]
-                    px = bid[0]
-                    orders = bid[1]
-                    total_sz = sum(float(o[0]) for o in orders if isinstance(o, list))
-                    print(f"    [{i+1}] ${float(px):,.2f} x {total_sz:.4f} ({len(orders)} orders)")
-                    for j, order in enumerate(orders[:2]):
-                        if isinstance(order, list) and len(order) >= 2:
-                            print(f"         └─ {order[0]} (oid: {order[1]})")
-                else:
-                    print(f"    [{i+1}] {bid}")
+        if update_type == "snapshot":
+            # Snapshot: bids/asks are lists of order dicts with limit_px, sz, oid, etc.
+            print(f"  Total: {len(bids)} bids, {len(asks)} asks")
+            print("  TOP BIDS:")
+            for i, bid in enumerate(bids[:3]):
+                if isinstance(bid, dict):
+                    px = bid.get("limit_px", "?")
+                    sz = bid.get("sz", "?")
+                    oid = bid.get("oid", "?")
+                    print(f"    [{i+1}] ${float(px):,.2f} x {sz} (oid: {oid})")
 
-        # Show top 3 ask levels
-        print("  TOP ASKS:")
-        for i, ask in enumerate(asks[:3]):
-            if isinstance(ask, list):
-                if len(ask) >= 3:
-                    px, sz, oid = ask[0], ask[1], ask[2]
-                    print(f"    [{i+1}] ${float(px):,.2f} x {sz} (order: {oid})")
-                elif len(ask) >= 2 and isinstance(ask[1], list):
-                    px = ask[0]
-                    orders = ask[1]
-                    total_sz = sum(float(o[0]) for o in orders if isinstance(o, list))
-                    print(f"    [{i+1}] ${float(px):,.2f} x {total_sz:.4f} ({len(orders)} orders)")
-                else:
-                    print(f"    [{i+1}] {ask}")
+            print("  TOP ASKS:")
+            for i, ask in enumerate(asks[:3]):
+                if isinstance(ask, dict):
+                    px = ask.get("limit_px", "?")
+                    sz = ask.get("sz", "?")
+                    oid = ask.get("oid", "?")
+                    print(f"    [{i+1}] ${float(px):,.2f} x {sz} (oid: {oid})")
+        else:
+            # Diff: contains incremental changes
+            diff_data = data.get("data", {})
+            if diff_data:
+                print(f"  Changes: {list(diff_data.keys())[:5]}...")
+            else:
+                print("  (incremental update)")
 
         print()
 
@@ -310,10 +300,12 @@ def stream_blocks_example():
         nonlocal block_count
         block_count += 1
 
-        block_num = data.get("block_number", data.get("blockNumber", "?"))
-        timestamp_val = data.get("timestamp", data.get("time", "?"))
+        # Block structure: {"abci_block": {"time": "...", "signed_action_bundles": [...]}, "resps": [...]}
+        abci_block = data.get("abci_block", {})
+        block_time = abci_block.get("time", "?")
+        bundles = len(abci_block.get("signed_action_bundles", []))
 
-        print(f"[{timestamp()}] BLOCK #{block_num} @ {timestamp_val}")
+        print(f"[{timestamp()}] BLOCK @ {block_time} ({bundles} bundles)")
 
         if block_count >= 3:
             print(f"\nReceived {block_count} blocks. Demo complete!")
