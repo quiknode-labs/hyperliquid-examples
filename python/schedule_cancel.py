@@ -14,10 +14,15 @@ from hyperliquid_sdk import HyperliquidSDK
 sdk = HyperliquidSDK()
 
 # Schedule cancel all orders in 60 seconds
-cancel_time = int(time.time() * 1000) + 60000  # 60 seconds from now
-result = sdk.schedule_cancel(cancel_time)
-print(f"Scheduled cancel at {cancel_time}: {result}")
+# cancel_time = int(time.time() * 1000) + 60000  # 60 seconds from now
+# result = sdk.schedule_cancel(cancel_time)
+# print(f"Scheduled cancel at {cancel_time}: {result}")
 
 # To cancel the scheduled cancel (keep orders alive):
-result = sdk.schedule_cancel(None)
-print(f"Cancelled scheduled cancel: {result}")
+# result = sdk.schedule_cancel(None)
+# print(f"Cancelled scheduled cancel: {result}")
+
+print("Schedule cancel methods available:")
+print("  sdk.schedule_cancel(time_ms)  # Schedule cancel at timestamp")
+print("  sdk.schedule_cancel(None)     # Cancel the scheduled cancel")
+print("\nNOTE: Requires $1M trading volume on your account")
