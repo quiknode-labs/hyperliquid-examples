@@ -46,13 +46,23 @@ except Exception as e:
     print(f"   Error: {e}")
     print("   Note: candleSnapshot may not be available on this endpoint")
 
-# Funding history
-print("\n2. BTC Funding History:")
+# Predicted funding rates (supported on QuickNode)
+print("\n2. Predicted Funding Rates:")
 try:
-    funding = info.funding_history("BTC", day_ago, now)
-    print(f"   {len(funding)} entries")
-    for f in funding[-3:]:
-        print(f"   Rate: {f.get('fundingRate')}")
+    fundings = info.predicted_fundings()
+    print(f"   {len(fundings)} assets with funding rates:")
+    # Structure: [[coin, [[source, {fundingRate, ...}], ...]], ...]
+    for item in fundings[:5]:
+        if isinstance(item, list) and len(item) >= 2:
+            coin = item[0]
+            sources = item[1]
+            if sources and isinstance(sources, list) and len(sources) > 0:
+                # Get HlPerp funding rate if available
+                for src in sources:
+                    if isinstance(src, list) and len(src) >= 2 and src[0] == "HlPerp":
+                        rate = float(src[1].get("fundingRate", 0)) * 100
+                        print(f"   {coin}: {rate:.4f}%")
+                        break
 except Exception as e:
     print(f"   Error: {e}")
 
