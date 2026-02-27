@@ -60,7 +60,7 @@ See the README in each language directory for the full list.
 
 - **SDK Repository**: https://github.com/quiknode-labs/hyperliquid-sdk
 - **SDK on PyPI**: https://pypi.org/project/hyperliquid-sdk/
-- **Documentation**: https://hyperliquidapi.com/docs
+- **Documentation**: https://hyperliquidapi.com
 - **QuickNode Docs**: https://www.quicknode.com/docs/hyperliquid
 
 ## Disclaimer
