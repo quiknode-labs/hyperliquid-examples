@@ -35,22 +35,48 @@ cd rust
 cargo run --example market_order
 ```
 
-## Examples
+## Python Examples
 
-| Example | Description | Python | TypeScript | Rust |
-|---------|-------------|--------|------------|------|
-| Market Order | Buy/sell at market price | [market_order.py](python/market_order.py) | Coming soon | Coming soon |
-| Limit Order | Place a limit order | [place_order.py](python/place_order.py) | Coming soon | Coming soon |
-| Cancel Order | Place and cancel | [cancel_order.py](python/cancel_order.py) | Coming soon | Coming soon |
-| Modify Order | Modify a resting order | [modify_order.py](python/modify_order.py) | Coming soon | Coming soon |
-| Close Position | Close an open position | [close_position.py](python/close_position.py) | Coming soon | Coming soon |
-| Roundtrip | Buy then sell | [roundtrip.py](python/roundtrip.py) | Coming soon | Coming soon |
-| Fluent Builder | Power user patterns | [fluent_builder.py](python/fluent_builder.py) | Coming soon | Coming soon |
-| Full Demo | All features | [full_demo.py](python/full_demo.py) | Coming soon | Coming soon |
+### Order Placement
+| Example | Description |
+|---------|-------------|
+| [market_order.py](python/market_order.py) | Market buy/sell that executes immediately |
+| [place_order.py](python/place_order.py) | Limit order that rests on the book |
+| [fluent_builder.py](python/fluent_builder.py) | Power user fluent API for orders |
+| [hip3_order.py](python/hip3_order.py) | Trade HIP-3 markets (community perps) |
+
+### Order Management
+| Example | Description |
+|---------|-------------|
+| [cancel_order.py](python/cancel_order.py) | Cancel an order by OID |
+| [cancel_by_cloid.py](python/cancel_by_cloid.py) | Cancel by client order ID |
+| [cancel_all.py](python/cancel_all.py) | Cancel all open orders |
+| [schedule_cancel.py](python/schedule_cancel.py) | Dead-man's switch auto-cancel |
+| [modify_order.py](python/modify_order.py) | Modify a resting order |
+
+### Position Management
+| Example | Description |
+|---------|-------------|
+| [close_position.py](python/close_position.py) | Close a position completely |
+| [roundtrip.py](python/roundtrip.py) | Buy then sell (complete cycle) |
+
+### Market Data & Status
+| Example | Description |
+|---------|-------------|
+| [markets.py](python/markets.py) | List all markets and DEXes |
+| [open_orders.py](python/open_orders.py) | View open orders |
+| [preflight.py](python/preflight.py) | Validate orders before signing |
+| [approve.py](python/approve.py) | Manage builder fee approval |
+
+### Complete Demo
+| Example | Description |
+|---------|-------------|
+| [full_demo.py](python/full_demo.py) | All features in one file |
 
 ## Links
 
 - **SDK Repository**: https://github.com/quiknode-labs/hyperliquid-sdk
+- **SDK on PyPI**: https://pypi.org/project/hyperliquid-sdk/
 - **Documentation**: https://hyperliquidapi.com/docs
 
 ## Disclaimer
