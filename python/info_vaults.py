@@ -14,7 +14,7 @@ Usage:
 """
 
 import os
-from hyperliquid_sdk import Info
+from hyperliquid_sdk import HyperliquidSDK
 
 ENDPOINT = os.environ.get("ENDPOINT")
 USER = os.environ.get("USER_ADDRESS")
@@ -23,7 +23,9 @@ if not ENDPOINT:
     print("Set ENDPOINT environment variable")
     exit(1)
 
-info = Info(ENDPOINT)
+# Single SDK instance — access everything through sdk.info, sdk.core, sdk.evm, etc.
+sdk = HyperliquidSDK(ENDPOINT)
+info = sdk.info
 
 print("=" * 50)
 print("Vaults & Delegation")

@@ -12,7 +12,7 @@ sdk = HyperliquidSDK()
 # List HIP-3 DEXes
 dexes = sdk.dexes()
 print("Available HIP-3 DEXes:")
-for dex in dexes.get("dexes", [])[:5]:
+for dex in dexes[:5]:
     print(f"  {dex.get('name', dex)}")
 
 # Trade on a HIP-3 market

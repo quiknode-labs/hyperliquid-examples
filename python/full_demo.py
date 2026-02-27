@@ -35,7 +35,7 @@ print(f"Perp markets: {len(markets.get('perps', []))}")
 print(f"Spot markets: {len(markets.get('spot', []))}")
 
 dexes = sdk.dexes()
-print(f"HIP-3 DEXes: {len(dexes.get('dexes', []))}")
+print(f"HIP-3 DEXes: {len(dexes)}")
 
 # ============================================================================
 # APPROVAL STATUS

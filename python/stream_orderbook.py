@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """
-Order Book Streaming Example — L2 and L4 Order Books
+Order Book Streaming Example — L2 and L4 Order Books via gRPC
 
-This example demonstrates how to stream order book data:
-- L2 Book: Aggregated by price level (WebSocket or gRPC)
-- L4 Book: Individual orders with order IDs (gRPC only)
+This example demonstrates how to stream order book data via gRPC:
+- L2 Book: Aggregated by price level (total size and order count per price)
+- L4 Book: Individual orders with order IDs
 
-L4 order book is CRITICAL for:
-- Market making: Know exact queue position and order sizes
-- Order flow analysis: Detect large orders and icebergs
-- Optimal execution: See exactly what you're crossing
-- Latency-sensitive trading: Lower latency than WebSocket
+Note: L2/L4 order books are only available via gRPC on QuickNode.
+      WebSocket streaming provides book_updates (incremental deltas) instead.
+
+Use cases:
+- L2 Book: Market depth, spread monitoring, analytics dashboards
+- L4 Book: HFT, quant trading, market making, order flow analysis
 
 Setup:
     pip install hyperliquid-sdk
@@ -26,7 +27,7 @@ import time
 from datetime import datetime
 from typing import Dict, List, Any
 
-from hyperliquid_sdk import GRPCStream, Stream, ConnectionState
+from hyperliquid_sdk import GRPCStream
 
 ENDPOINT = os.environ.get("ENDPOINT")
 if not ENDPOINT:
@@ -169,49 +170,6 @@ def stream_l2_grpc():
     print(f"\nReceived {update_count} L2 updates via gRPC")
 
 
-def stream_l2_websocket():
-    """Stream L2 order book via WebSocket."""
-    print("\n" + "=" * 60)
-    print("L2 ORDER BOOK via WebSocket")
-    print("=" * 60)
-
-    tracker = L2BookTracker("BTC")
-    update_count = 0
-
-    def on_l2(data: Dict[str, Any]):
-        nonlocal update_count
-        update_count += 1
-
-        # WebSocket format: {"channel": "l2Book", "data": {...}}
-        book = data.get("data", {})
-        levels = book.get("levels", [[], []])
-
-        # Convert to common format
-        converted = {
-            "bids": levels[0] if len(levels) > 0 else [],
-            "asks": levels[1] if len(levels) > 1 else [],
-        }
-        tracker.update(converted)
-
-        if update_count <= 3:
-            tracker.display()
-
-    stream = Stream(ENDPOINT, reconnect=False)
-    stream.l2_book("BTC", on_l2)
-
-    print("Subscribing to BTC L2 book via WebSocket...")
-    print("-" * 60)
-
-    stream.start()
-
-    start = time.time()
-    while update_count < 3 and time.time() - start < 15:
-        time.sleep(0.1)
-
-    stream.stop()
-    print(f"\nReceived {update_count} L2 updates via WebSocket")
-
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # L4 ORDER BOOK (Individual Orders) — CRITICAL FOR TRADING
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -273,14 +231,6 @@ class L4BookTracker:
             key=lambda x: float(x["px"])
         )
 
-    def orders_at_price(self, price: float, side: str = "bid") -> List[Dict]:
-        """Get all orders at a specific price."""
-        book = self.bids if side == "bid" else self.asks
-        return [
-            order for order in book.values()
-            if abs(float(order["px"]) - price) < 0.01  # Price tolerance
-        ]
-
     def total_orders(self) -> tuple:
         """Return (bid_count, ask_count)."""
         return (len(self.bids), len(self.asks))
@@ -316,7 +266,7 @@ class L4BookTracker:
             total_sz = sum(float(o["sz"]) for o in orders)
             print(f"  ${px:>12,.2f} | {total_sz:>10.4f} | {len(orders):>3} orders")
             # Show individual orders (first 3)
-            for i, order in enumerate(orders[:3]):
+            for order in orders[:3]:
                 print(f"               └─ {float(order['sz']):>10.4f} (oid: {order['oid'][:8]}...)")
 
         print("  " + "-" * 56)
@@ -330,7 +280,7 @@ class L4BookTracker:
             orders = bid_prices[px]
             total_sz = sum(float(o["sz"]) for o in orders)
             print(f"  ${px:>12,.2f} | {total_sz:>10.4f} | {len(orders):>3} orders")
-            for i, order in enumerate(orders[:3]):
+            for order in orders[:3]:
                 print(f"               └─ {float(order['sz']):>10.4f} (oid: {order['oid'][:8]}...)")
 
         bid_count, ask_count = self.total_orders()
@@ -396,7 +346,7 @@ def comparison():
     print("├─────────────────────────────────────────────────────────────┤")
     print("│ • Aggregated by price level                                 │")
     print("│ • Shows total size at each price                            │")
-    print("│ • Available via WebSocket AND gRPC                          │")
+    print("│ • Available via gRPC (StreamL2Book)                         │")
     print("│ • Lower bandwidth                                           │")
     print("│ • Good for: Price monitoring, simple trading                │")
     print("├─────────────────────────────────────────────────────────────┤")
@@ -410,7 +360,7 @@ def comparison():
     print("├─────────────────────────────────────────────────────────────┤")
     print("│ • Individual orders with order IDs                          │")
     print("│ • Shows each order separately                               │")
-    print("│ • Available via gRPC ONLY (higher performance)              │")
+    print("│ • Available via gRPC (StreamL4Book)                         │")
     print("│ • Higher bandwidth but more detail                          │")
     print("│ • Good for: Market making, HFT, order flow analysis         │")
     print("├─────────────────────────────────────────────────────────────┤")
@@ -422,6 +372,9 @@ def comparison():
     print("│   (You see every order and can track queue position)        │")
     print("└─────────────────────────────────────────────────────────────┘")
     print()
+    print("Note: For incremental book changes (deltas), use WebSocket:")
+    print("  stream.book_updates(coins, callback)")
+    print()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -430,7 +383,7 @@ def comparison():
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("Order Book Streaming Examples")
+    print("Order Book Streaming Examples (gRPC)")
     print("=" * 60)
     print(f"Endpoint: {ENDPOINT[:50]}...")
 
@@ -438,9 +391,8 @@ if __name__ == "__main__":
         # Show comparison
         comparison()
 
-        # Run L2 examples
+        # Run L2 example
         stream_l2_grpc()
-        stream_l2_websocket()
 
         # Run L4 example (CRITICAL)
         stream_l4_book()

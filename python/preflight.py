@@ -3,10 +3,13 @@ Preflight Validation Example
 
 Validate an order BEFORE signing to catch tick size and lot size errors.
 Saves failed transactions by checking validity upfront.
+
+No endpoint or private key needed — uses public API.
 """
 
 from hyperliquid_sdk import HyperliquidSDK
 
+# No endpoint or private key needed for read-only public queries
 sdk = HyperliquidSDK()
 
 # Get current price

@@ -27,7 +27,7 @@ import sys
 import time
 from datetime import datetime
 
-from hyperliquid_sdk import GRPCStream, ConnectionState
+from hyperliquid_sdk import HyperliquidSDK, GRPCStream, ConnectionState
 
 ENDPOINT = os.environ.get("ENDPOINT")
 if not ENDPOINT:
@@ -40,6 +40,10 @@ if not ENDPOINT:
     print()
     print("gRPC is included with all QuickNode Hyperliquid endpoints.")
     sys.exit(1)
+
+# Single SDK instance — can use sdk.grpc for streaming
+# Note: For standalone usage without SDK, you can also use GRPCStream(ENDPOINT) directly
+sdk = HyperliquidSDK(ENDPOINT)
 
 
 def timestamp():
@@ -72,6 +76,8 @@ def stream_trades_example():
         if trade_count >= 5:
             print(f"\nReceived {trade_count} trades. Moving to next example...")
 
+    # Use standalone GRPCStream for demo (with reconnect=False to stop cleanly)
+    # In real usage, you could also use sdk.grpc which shares the endpoint
     stream = GRPCStream(ENDPOINT, reconnect=False)
     stream.trades(["BTC", "ETH"], on_trade)
 

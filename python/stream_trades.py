@@ -1,9 +1,20 @@
 #!/usr/bin/env python3
 """
-WebSocket Streaming Example — Real-Time Market Data
+WebSocket Streaming Example — Real-Time HyperCore Data
 
-Stream trades, orders, book updates, L2 book, and user data via WebSocket.
-Includes all 20+ subscription types with automatic reconnection.
+Stream trades, orders, book updates, events, and TWAP via WebSocket.
+These are the data streams available on QuickNode endpoints.
+
+Available QuickNode WebSocket streams:
+- trades: Executed trades with price, size, direction
+- orders: Order lifecycle events (open, filled, cancelled)
+- book_updates: Order book changes (incremental deltas)
+- events: Balance changes, transfers, deposits, withdrawals
+- twap: TWAP execution data
+- writer_actions: HyperCore <-> HyperEVM asset transfers
+
+Note: L2/L4 order book snapshots are available via gRPC (see stream_orderbook.py).
+      Other streams (allMids, bbo, candle) require the public Hyperliquid API.
 
 Setup:
     pip install hyperliquid-sdk
@@ -57,10 +68,12 @@ def stream_trades_example():
 
     def on_trade(data):
         nonlocal trade_count
-        # Data format: {"channel": "trades", "data": [{trade}, ...]}
-        trades = data.get("data", [])
-        if isinstance(trades, list):
-            for t in trades:
+        # QuickNode format: {"type": "data", "stream": "hl.trades", "block": {"events": [...]}}
+        # Events are [[user, trade_data], ...]
+        block = data.get("block", {})
+        for event in block.get("events", []):
+            if isinstance(event, list) and len(event) >= 2:
+                t = event[1]  # trade_data is second element
                 trade_count += 1
                 coin = t.get("coin", "?")
                 px = float(t.get("px", 0))
@@ -89,66 +102,52 @@ def stream_trades_example():
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# EXAMPLE 2: Stream L2 Order Book
+# EXAMPLE 2: Stream Orders
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def stream_l2_book_example():
-    """Stream L2 order book snapshots."""
+def stream_orders_example():
+    """Stream order lifecycle events."""
     print("\n" + "=" * 60)
-    print("EXAMPLE 2: Streaming L2 Order Book")
+    print("EXAMPLE 2: Streaming Orders")
     print("=" * 60)
     print()
-    print("L2 book shows aggregated order sizes at each price level.")
+    print("Order events: open, filled, triggered, canceled, etc.")
     print()
 
-    update_count = 0
+    order_count = 0
 
-    def on_l2_book(data):
-        nonlocal update_count
-        update_count += 1
+    def on_order(data):
+        nonlocal order_count
+        block = data.get("block", {})
+        for event in block.get("events", []):
+            if isinstance(event, list) and len(event) >= 2:
+                o = event[1]  # order data
+                order_count += 1
+                coin = o.get("coin", "?")
+                status = o.get("status", "?")
+                side = "BUY" if o.get("side") == "B" else "SELL"
+                px = o.get("px", "?")
+                sz = o.get("sz", "?")
+                print(f"[{timestamp()}] {status}: {side} {sz} {coin} @ ${px}")
 
-        # Data format: {"channel": "l2Book", "data": {coin, levels: [[bids], [asks]]}}
-        book = data.get("data", {})
-        coin = book.get("coin", "BTC")
-        levels = book.get("levels", [[], []])
-
-        bids = levels[0] if len(levels) > 0 else []
-        asks = levels[1] if len(levels) > 1 else []
-
-        if bids and asks:
-            best_bid = bids[0] if bids else {}
-            best_ask = asks[0] if asks else {}
-
-            bid_px = float(best_bid.get("px", 0))
-            bid_sz = best_bid.get("sz", "0")
-            ask_px = float(best_ask.get("px", 0))
-            ask_sz = best_ask.get("sz", "0")
-            spread = ask_px - bid_px
-
-            print(f"[{timestamp()}] {coin} L2 Book:")
-            print(f"  Best Bid: ${bid_px:,.2f} x {bid_sz}")
-            print(f"  Best Ask: ${ask_px:,.2f} x {ask_sz}")
-            print(f"  Spread:   ${spread:,.2f}")
-            print(f"  Levels:   {len(bids)} bids, {len(asks)} asks")
-            print()
-
-        if update_count >= 3:
-            print("Received 3 L2 updates. Moving to next example...")
+                if order_count >= 10:
+                    print(f"\nReceived {order_count} orders. Moving to next example...")
+                    return
 
     stream = Stream(ENDPOINT, reconnect=False)
-    stream.l2_book("BTC", on_l2_book)
+    stream.orders(["BTC", "ETH"], on_order)
 
-    print("Subscribing to BTC L2 order book...")
+    print("Subscribing to BTC and ETH orders...")
     print("-" * 60)
 
     stream.start()
 
     start = time.time()
-    while update_count < 3 and time.time() - start < 20:
+    while order_count < 10 and time.time() - start < 20:
         time.sleep(0.1)
 
     stream.stop()
-    print(f"Total L2 updates received: {update_count}")
+    print(f"Total orders received: {order_count}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -161,27 +160,37 @@ def stream_book_updates_example():
     print("EXAMPLE 3: Streaming Book Updates (Incremental)")
     print("=" * 60)
     print()
-    print("Book updates show changes to the order book (deltas).")
-    print("More efficient than full L2 snapshots for high-frequency use.")
+    print("Book updates show individual order changes to the order book.")
+    print("Each event contains: user, oid, coin, side, px, raw_book_diff")
     print()
 
     update_count = 0
 
     def on_book_update(data):
         nonlocal update_count
-        update_count += 1
+        block = data.get("block", {})
+        events = block.get("events", [])
 
-        book = data.get("data", {})
-        coin = book.get("coin", "?")
-        levels = book.get("levels", [[], []])
+        if events:
+            update_count += 1
+            # Show first event from this block
+            event = events[0]
+            coin = event.get("coin", "?")
+            side = "BID" if event.get("side") == "B" else "ASK"
+            px = event.get("px", "?")
+            diff = event.get("raw_book_diff", {})
 
-        bid_changes = len(levels[0]) if len(levels) > 0 else 0
-        ask_changes = len(levels[1]) if len(levels) > 1 else 0
+            if diff == "remove":
+                action = "REMOVE"
+                sz = "-"
+            else:
+                action = "ADD/UPDATE"
+                sz = diff.get("new", {}).get("sz", "?") if isinstance(diff, dict) else "?"
 
-        print(f"[{timestamp()}] {coin} Book Update: {bid_changes} bid changes, {ask_changes} ask changes")
+            print(f"[{timestamp()}] {coin} {side} @ ${px}: {action} size={sz} (+{len(events)-1} more)")
 
-        if update_count >= 10:
-            print(f"\nReceived {update_count} updates. Moving to next example...")
+            if update_count >= 10:
+                print(f"\nReceived {update_count} blocks. Moving to next example...")
 
     stream = Stream(ENDPOINT, reconnect=False)
     stream.book_updates(["BTC"], on_book_update)
@@ -196,190 +205,105 @@ def stream_book_updates_example():
         time.sleep(0.1)
 
     stream.stop()
-    print(f"Total book updates received: {update_count}")
+    print(f"Total book update blocks received: {update_count}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# EXAMPLE 4: Stream All Mid Prices
+# EXAMPLE 4: Stream Events
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def stream_all_mids_example():
-    """Stream all mid prices (efficient for monitoring many assets)."""
+def stream_events_example():
+    """Stream balance changes, transfers, deposits, withdrawals."""
     print("\n" + "=" * 60)
-    print("EXAMPLE 4: Streaming All Mid Prices")
+    print("EXAMPLE 4: Streaming Events")
     print("=" * 60)
     print()
-    print("Get real-time mid prices for ALL assets in one stream.")
+    print("Events: balance changes, transfers, deposits, withdrawals, vault ops")
     print()
 
-    update_count = 0
+    event_count = 0
 
-    def on_all_mids(data):
-        nonlocal update_count
-        update_count += 1
+    def on_event(data):
+        nonlocal event_count
+        block = data.get("block", {})
+        events = block.get("events", [])
 
-        # Data format: {"channel": "allMids", "data": {"mids": {"BTC": "95000", "ETH": "3500", ...}}}
-        mids_data = data.get("data", {})
-        mids = mids_data.get("mids", mids_data)  # Handle both formats
+        for event in events:
+            event_count += 1
+            # Event structure varies by type
+            event_type = "unknown"
+            if isinstance(event, dict):
+                if "deposit" in event:
+                    event_type = "deposit"
+                elif "withdraw" in event:
+                    event_type = "withdraw"
+                elif "transfer" in event:
+                    event_type = "transfer"
+                elif "funding" in event:
+                    event_type = "funding"
+                elif "liquidation" in event:
+                    event_type = "liquidation"
+                else:
+                    event_type = list(event.keys())[0] if event else "unknown"
 
-        if isinstance(mids, dict):
-            # Show top 5 by price
-            sorted_mids = sorted(
-                [(k, float(v)) for k, v in mids.items() if v],
-                key=lambda x: x[1],
-                reverse=True
-            )[:5]
+            print(f"[{timestamp()}] Event #{event_count}: {event_type}")
 
-            print(f"[{timestamp()}] All Mids Update (top 5 by price):")
-            for coin, price in sorted_mids:
-                print(f"  {coin}: ${price:,.2f}")
-            print()
-
-        if update_count >= 3:
-            print("Received 3 updates. Moving to next example...")
+            if event_count >= 5:
+                print(f"\nReceived {event_count} events. Moving to next example...")
+                return
 
     stream = Stream(ENDPOINT, reconnect=False)
-    stream.all_mids(on_all_mids)
+    stream.events(on_event)
 
-    print("Subscribing to all mid prices...")
+    print("Subscribing to all events...")
     print("-" * 60)
 
     stream.start()
 
     start = time.time()
-    while update_count < 3 and time.time() - start < 20:
+    while event_count < 5 and time.time() - start < 30:
         time.sleep(0.1)
 
     stream.stop()
-    print(f"Total mid price updates received: {update_count}")
+    print(f"Total events received: {event_count}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# EXAMPLE 5: Stream Candles
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def stream_candles_example():
-    """Stream candlestick data."""
-    print("\n" + "=" * 60)
-    print("EXAMPLE 5: Streaming Candles")
-    print("=" * 60)
-    print()
-    print("Real-time candlestick updates.")
-    print("Intervals: 1m, 5m, 15m, 1h, 4h, 1d")
-    print()
-
-    update_count = 0
-
-    def on_candle(data):
-        nonlocal update_count
-        update_count += 1
-
-        candle = data.get("data", {})
-        coin = candle.get("s", "?")  # Symbol
-        o = candle.get("o", "?")     # Open
-        h = candle.get("h", "?")     # High
-        l = candle.get("l", "?")     # Low
-        c = candle.get("c", "?")     # Close
-        v = candle.get("v", "?")     # Volume
-
-        print(f"[{timestamp()}] {coin} 1m Candle:")
-        print(f"  O: {o}  H: {h}  L: {l}  C: {c}  V: {v}")
-        print()
-
-        if update_count >= 2:
-            print("Received 2 candle updates. Moving to next example...")
-
-    stream = Stream(ENDPOINT, reconnect=False)
-    stream.candle("BTC", "1m", on_candle)
-
-    print("Subscribing to BTC 1-minute candles...")
-    print("-" * 60)
-
-    stream.start()
-
-    start = time.time()
-    while update_count < 2 and time.time() - start < 120:  # Candles update every minute
-        time.sleep(0.1)
-
-    stream.stop()
-    print(f"Total candle updates received: {update_count}")
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# EXAMPLE 6: Stream BBO (Best Bid/Offer)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def stream_bbo_example():
-    """Stream best bid/offer updates."""
-    print("\n" + "=" * 60)
-    print("EXAMPLE 6: Streaming BBO (Best Bid/Offer)")
-    print("=" * 60)
-    print()
-    print("Efficient stream for just the top of book.")
-    print()
-
-    update_count = 0
-
-    def on_bbo(data):
-        nonlocal update_count
-        update_count += 1
-
-        bbo = data.get("data", {})
-        coin = bbo.get("coin", "?")
-        bid_px = bbo.get("bidPx", "?")
-        bid_sz = bbo.get("bidSz", "?")
-        ask_px = bbo.get("askPx", "?")
-        ask_sz = bbo.get("askSz", "?")
-
-        print(f"[{timestamp()}] {coin} BBO: Bid {bid_sz}@{bid_px} | Ask {ask_sz}@{ask_px}")
-
-        if update_count >= 5:
-            print(f"\nReceived {update_count} BBO updates. Demo complete!")
-
-    stream = Stream(ENDPOINT, reconnect=False)
-    stream.bbo("BTC", on_bbo)
-
-    print("Subscribing to BTC BBO...")
-    print("-" * 60)
-
-    stream.start()
-
-    start = time.time()
-    while update_count < 5 and time.time() - start < 20:
-        time.sleep(0.1)
-
-    stream.stop()
-    print(f"Total BBO updates received: {update_count}")
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# EXAMPLE 7: Multiple Subscriptions with Connection Management
+# EXAMPLE 5: Multiple Subscriptions with Connection Management
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def multi_stream_example():
     """Stream multiple data types with full connection management."""
     print("\n" + "=" * 60)
-    print("EXAMPLE 7: Multiple Subscriptions + Connection Management")
+    print("EXAMPLE 5: Multiple Subscriptions + Connection Management")
     print("=" * 60)
 
-    counts = {"trades": 0, "l2": 0, "mids": 0}
+    counts = {"trades": 0, "orders": 0, "book": 0}
 
     def on_trade(data):
         counts["trades"] += 1
-        trades = data.get("data", [])
-        if isinstance(trades, list) and trades:
-            coin = trades[0].get("coin", "?")
+        block = data.get("block", {})
+        events = block.get("events", [])
+        if events and isinstance(events[0], list) and len(events[0]) >= 2:
+            coin = events[0][1].get("coin", "?")
             print(f"[TRADE] {coin} - Total: {counts['trades']}")
 
-    def on_l2(data):
-        counts["l2"] += 1
-        book = data.get("data", {})
-        coin = book.get("coin", "?")
-        print(f"[L2]    {coin} - Total: {counts['l2']}")
+    def on_order(data):
+        counts["orders"] += 1
+        block = data.get("block", {})
+        events = block.get("events", [])
+        if events and isinstance(events[0], list) and len(events[0]) >= 2:
+            coin = events[0][1].get("coin", "?")
+            status = events[0][1].get("status", "?")
+            print(f"[ORDER] {coin} {status} - Total: {counts['orders']}")
 
-    def on_mids(data):
-        counts["mids"] += 1
-        print(f"[MIDS]  All assets - Total: {counts['mids']}")
+    def on_book(data):
+        counts["book"] += 1
+        block = data.get("block", {})
+        events = block.get("events", [])
+        if events:
+            coin = events[0].get("coin", "?")
+            print(f"[BOOK]  {coin} changes: {len(events)} - Total blocks: {counts['book']}")
 
     def on_state(state: ConnectionState):
         print(f"[STATE] {state.value}")
@@ -399,12 +323,12 @@ def multi_stream_example():
         max_reconnect_attempts=3,
     )
 
-    # Multiple subscriptions
+    # Multiple subscriptions (all QuickNode-supported)
     stream.trades(["BTC", "ETH"], on_trade)
-    stream.l2_book("BTC", on_l2)
-    stream.all_mids(on_mids)
+    stream.orders(["BTC"], on_order)
+    stream.book_updates(["BTC"], on_book)
 
-    print("Subscribing to trades, L2 book, and all mids...")
+    print("Subscribing to trades, orders, and book updates...")
     print("-" * 60)
 
     def signal_handler(sig, frame):
@@ -425,65 +349,48 @@ def multi_stream_example():
     print("=" * 60)
     print("SUMMARY")
     print("=" * 60)
-    print(f"  Trades received: {counts['trades']}")
-    print(f"  L2 updates:      {counts['l2']}")
-    print(f"  Mid updates:     {counts['mids']}")
+    print(f"  Trades received:     {counts['trades']}")
+    print(f"  Orders received:     {counts['orders']}")
+    print(f"  Book update blocks:  {counts['book']}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# USER DATA STREAMS (Requires user address)
+# AVAILABLE STREAMS INFO
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def user_streams_info():
-    """Show available user data streams."""
+def streams_info():
+    """Show available QuickNode WebSocket streams."""
     print("\n" + "=" * 60)
-    print("USER DATA STREAMS")
+    print("AVAILABLE QUICKNODE WEBSOCKET STREAMS")
     print("=" * 60)
     print()
-    print("The following streams require a user address:")
+    print("HyperCore Data Streams:")
     print()
-    print("  stream.open_orders(user, callback)")
-    print("    - User's open orders")
+    print("  stream.trades(coins, callback)")
+    print("    - Executed trades with price, size, direction")
     print()
-    print("  stream.order_updates(user, callback)")
-    print("    - Order status changes")
+    print("  stream.orders(coins, callback)")
+    print("    - Order lifecycle: open, filled, triggered, canceled")
     print()
-    print("  stream.user_events(user, callback)")
-    print("    - All user events (fills, funding, liquidations)")
+    print("  stream.book_updates(coins, callback)")
+    print("    - Incremental order book changes (deltas)")
     print()
-    print("  stream.user_fills(user, callback)")
-    print("    - Trade fills")
+    print("  stream.events(callback)")
+    print("    - Balance changes, transfers, deposits, withdrawals")
     print()
-    print("  stream.user_fundings(user, callback)")
-    print("    - Funding payments")
+    print("  stream.twap(coins, callback)")
+    print("    - TWAP execution data and progress")
     print()
-    print("  stream.user_non_funding_ledger(user, callback)")
-    print("    - Ledger changes (deposits, withdrawals, transfers)")
+    print("  stream.writer_actions(callback)")
+    print("    - HyperCore <-> HyperEVM asset transfers")
     print()
-    print("  stream.clearinghouse_state(user, callback)")
-    print("    - Position and margin updates")
+    print("For L2/L4 Order Books:")
+    print("  Use gRPC streaming (see stream_orderbook.py)")
+    print("  - StreamL2Book: Aggregated price levels")
+    print("  - StreamL4Book: Individual orders with order IDs")
     print()
-    print("  stream.active_asset_data(user, coin, callback)")
-    print("    - User's trading parameters for specific asset")
-    print()
-    print("  stream.twap_states(user, callback)")
-    print("    - TWAP algorithm states")
-    print()
-    print("  stream.user_twap_slice_fills(user, callback)")
-    print("    - Individual TWAP order slice fills")
-    print()
-    print("  stream.user_twap_history(user, callback)")
-    print("    - TWAP execution history")
-    print()
-    print("  stream.notification(user, callback)")
-    print("    - User notifications")
-    print()
-    print("  stream.web_data_3(user, callback)")
-    print("    - Aggregate user info for frontend use")
-    print()
-    print("Example:")
-    print("  USER = '0x...'")
-    print("  stream.user_fills(USER, lambda f: print(f'Fill: {f}'))")
+    print("Example with filtering:")
+    print("  stream.trades(['BTC', 'ETH'], lambda t: print(t))")
     print()
 
 
@@ -493,31 +400,27 @@ def user_streams_info():
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("WebSocket Streaming Examples")
+    print("WebSocket Streaming Examples (QuickNode)")
     print("=" * 60)
     print(f"Endpoint: {ENDPOINT[:50]}...")
     print()
-    print("This demo shows WebSocket streaming capabilities:")
-    print("  1. Trades — Real-time executed trades")
-    print("  2. L2 Book — Order book snapshots")
-    print("  3. Book Updates — Incremental order book changes")
-    print("  4. All Mids — All asset mid prices")
-    print("  5. Candles — Candlestick data")
-    print("  6. BBO — Best bid/offer")
-    print("  7. Multi-stream — Multiple subscriptions")
+    print("This demo shows QuickNode WebSocket streaming capabilities:")
+    print("  1. Trades - Real-time executed trades")
+    print("  2. Orders - Order lifecycle events")
+    print("  3. Book Updates - Incremental order book changes")
+    print("  4. Events - Balance changes, transfers, etc.")
+    print("  5. Multi-stream - Multiple subscriptions")
     print()
 
     try:
         stream_trades_example()
-        stream_l2_book_example()
+        stream_orders_example()
         stream_book_updates_example()
-        stream_all_mids_example()
-        # stream_candles_example()  # Takes ~1 min, uncomment to test
-        stream_bbo_example()
+        stream_events_example()
         # multi_stream_example()  # Uncomment for full demo
 
-        # Show user data streams info
-        user_streams_info()
+        # Show available streams info
+        streams_info()
 
         print("=" * 60)
         print("All examples completed!")

@@ -13,14 +13,16 @@ Usage:
 """
 
 import os
-from hyperliquid_sdk import EVM
+from hyperliquid_sdk import HyperliquidSDK
 
 ENDPOINT = os.environ.get("ENDPOINT")
 if not ENDPOINT:
     print("Set ENDPOINT environment variable")
     exit(1)
 
-evm = EVM(ENDPOINT)
+# Single SDK instance — access everything through sdk.info, sdk.core, sdk.evm, etc.
+sdk = HyperliquidSDK(ENDPOINT)
+evm = sdk.evm
 
 print("=" * 50)
 print("HyperEVM (Ethereum JSON-RPC)")

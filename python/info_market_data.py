@@ -15,7 +15,7 @@ Usage:
 """
 
 import os
-from hyperliquid_sdk import Info
+from hyperliquid_sdk import HyperliquidSDK
 
 ENDPOINT = os.environ.get("ENDPOINT")
 if not ENDPOINT:
@@ -23,7 +23,9 @@ if not ENDPOINT:
     print("Example: export ENDPOINT='https://your-endpoint.hype-mainnet.quiknode.pro/TOKEN'")
     exit(1)
 
-info = Info(ENDPOINT)
+# Single SDK instance — access everything through sdk.info, sdk.core, sdk.evm, etc.
+sdk = HyperliquidSDK(ENDPOINT)
+info = sdk.info
 
 print("=" * 50)
 print("Market Data (Info API)")

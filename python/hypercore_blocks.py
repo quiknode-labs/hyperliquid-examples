@@ -16,14 +16,16 @@ Usage:
 """
 
 import os
-from hyperliquid_sdk import HyperCore
+from hyperliquid_sdk import HyperliquidSDK
 
 ENDPOINT = os.environ.get("ENDPOINT")
 if not ENDPOINT:
     print("Set ENDPOINT environment variable")
     exit(1)
 
-hc = HyperCore(ENDPOINT)
+# Single SDK instance — access everything through sdk.info, sdk.core, sdk.evm, etc.
+sdk = HyperliquidSDK(ENDPOINT)
+hc = sdk.core
 
 print("=" * 50)
 print("HyperCore Block Data")

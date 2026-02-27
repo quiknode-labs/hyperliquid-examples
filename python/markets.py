@@ -2,10 +2,13 @@
 Markets Example
 
 List all available markets and HIP-3 DEXes.
+
+No endpoint or private key needed — uses public API.
 """
 
 from hyperliquid_sdk import HyperliquidSDK
 
+# No endpoint or private key needed for read-only public queries
 sdk = HyperliquidSDK()
 
 # Get all markets
@@ -20,6 +23,6 @@ for m in markets.get("perps", [])[:5]:
 
 # Get HIP-3 DEXes
 dexes = sdk.dexes()
-print(f"\nHIP-3 DEXes: {len(dexes.get('dexes', []))}")
-for dex in dexes.get("dexes", [])[:5]:
-    print(f"  {dex.get('name', dex)}")
+print(f"\nHIP-3 DEXes: {len(dexes)}")
+for dex in dexes[:5]:
+    print(f"  {dex.get('name', 'N/A')}")
