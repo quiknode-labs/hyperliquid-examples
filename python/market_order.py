@@ -8,8 +8,8 @@ from hyperliquid_sdk import HyperliquidSDK
 
 sdk = HyperliquidSDK()
 
-# Market buy by size (0.0001 BTC)
-order = sdk.market_buy("BTC", size=0.0001)
+# Market buy by notional ($11 worth of BTC - minimum is $10)
+order = sdk.market_buy("BTC", notional=11)
 print(f"Market buy: {order}")
 print(f"  Status: {order.status}")
 print(f"  OID: {order.oid}")

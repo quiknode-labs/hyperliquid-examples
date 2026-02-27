@@ -9,10 +9,11 @@ from hyperliquid_sdk import HyperliquidSDK, Order
 sdk = HyperliquidSDK()
 mid = sdk.get_mid("BTC")
 
-# Simple limit order with GTC (Good Till Cancelled)
+# Simple limit order with GTC (Good Till Cancelled) - minimum $10 value
+# Use size directly to ensure proper decimal precision (BTC allows 5 decimals)
 order = sdk.order(
     Order.buy("BTC")
-         .size(0.0001)
+         .size(0.00017)  # ~$11 worth at ~$65k (minimum is $10)
          .price(int(mid * 0.97))
          .gtc()
 )

@@ -4,6 +4,8 @@ Schedule Cancel Example (Dead Man's Switch)
 Schedule automatic cancellation of all orders after a delay.
 If you don't send another schedule_cancel before the time expires,
 all your orders are cancelled. Useful as a safety mechanism.
+
+NOTE: Requires $1M trading volume on your account to use this feature.
 """
 
 import time
