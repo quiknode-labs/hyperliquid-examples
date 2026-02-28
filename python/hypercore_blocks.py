@@ -33,9 +33,9 @@ def main():
     print("HyperCore Block Data")
     print("=" * 50)
 
-    # Single SDK instance - access everything through sdk.info(), sdk.core(), sdk.evm()
+    # Single SDK instance - access everything through sdk.info, sdk.core, sdk.evm
     sdk = HyperliquidSDK(ENDPOINT)
-    hc = sdk.core()
+    hc = sdk.core
 
     # Latest block number
     print("\n1. Latest Block:")

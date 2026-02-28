@@ -49,14 +49,14 @@ def demo_info_api(sdk: HyperliquidSDK):
     separator("INFO API")
 
     subsection("Market Prices")
-    mids = sdk.info().all_mids()
+    mids = sdk.info.all_mids()
     print(f"Total markets: {len(mids)}")
     for coin in ["BTC", "ETH", "SOL", "DOGE"]:
         if coin in mids:
             print(f"  {coin}: ${float(mids[coin]):,.2f}")
 
     subsection("Order Book")
-    book = sdk.info().l2_book("BTC")
+    book = sdk.info.l2_book("BTC")
     levels = book.get("levels", [[], []])
     bids = levels[0] if len(levels) > 0 else []
     asks = levels[1] if len(levels) > 1 else []
@@ -66,18 +66,18 @@ def demo_info_api(sdk: HyperliquidSDK):
         print(f"  Spread: ${float(asks[0]['px']) - float(bids[0]['px']):,.2f}")
 
     subsection("Recent Trades")
-    trades = sdk.info().recent_trades("ETH")
+    trades = sdk.info.recent_trades("ETH")
     print(f"Last 3 ETH trades:")
     for t in trades[:3]:
         print(f"  {t['sz']} @ ${float(t['px']):,.2f} ({t['side']})")
 
     subsection("Exchange Metadata")
-    meta = sdk.info().meta()
+    meta = sdk.info.meta()
     universe = meta.get("universe", [])
     print(f"Total perp markets: {len(universe)}")
 
     subsection("Predicted Funding")
-    fundings = sdk.info().predicted_fundings()
+    fundings = sdk.info.predicted_fundings()
     # Extract funding rates - API returns [[coin, [[venue, fundingInfo], ...]], ...]
     entries = []
     for f in fundings:
@@ -106,23 +106,23 @@ def demo_hypercore_api(sdk: HyperliquidSDK):
     separator("HYPERCORE API")
 
     subsection("Latest Block")
-    block_num = sdk.core().latest_block_number()
+    block_num = sdk.core.latest_block_number()
     print(f"Latest block: {block_num:,}")
 
-    block = sdk.core().get_block(block_num)
+    block = sdk.core.get_block(block_num)
     if block:
         events = block.get("events", [])
         print(f"Block {block_num}: {len(events)} events")
 
     subsection("Recent Trades")
-    trades = sdk.core().latest_trades(count=5)
+    trades = sdk.core.latest_trades(count=5)
     print(f"Last 5 trades across all markets:")
     for t in trades:
         coin = t.get("coin", "?")
         print(f"  {coin}: {t.get('sz', '?')} @ ${float(t.get('px', 0)):,.2f}")
 
     subsection("Recent Orders")
-    orders = sdk.core().latest_orders(count=5)
+    orders = sdk.core.latest_orders(count=5)
     print(f"Last 5 orders:")
     for o in orders:
         coin = o.get("coin", "?")
@@ -136,16 +136,16 @@ def demo_evm_api(sdk: HyperliquidSDK):
     separator("EVM API")
 
     subsection("Chain Info")
-    chain_id = sdk.evm().chain_id()
-    block_num = sdk.evm().block_number()
-    gas_price = sdk.evm().gas_price()
+    chain_id = sdk.evm.chain_id()
+    block_num = sdk.evm.block_number()
+    gas_price = sdk.evm.gas_price()
 
     print(f"Chain ID: {chain_id} ({'Mainnet' if chain_id == 999 else 'Testnet'})")
     print(f"Block: {block_num:,}")
     print(f"Gas: {gas_price / 1e9:.2f} Gwei")
 
     subsection("Latest Block")
-    block = sdk.evm().get_block_by_number(block_num)
+    block = sdk.evm.get_block_by_number(block_num)
     if block:
         print(f"Block {block_num}:")
         print(f"  Hash: {block.get('hash', '?')[:30]}...")
@@ -176,7 +176,7 @@ def demo_websocket(sdk: HyperliquidSDK, duration: int = 5):
 
     print(f"Streaming for {duration} seconds...")
 
-    stream = sdk.stream()
+    stream = sdk.stream
     stream.on_error = on_error
     stream.trades(["BTC", "ETH"], on_trade)
     stream.book_updates(["BTC"], on_book)
@@ -207,7 +207,7 @@ def demo_grpc(sdk: HyperliquidSDK, duration: int = 5):
     print(f"Streaming for {duration} seconds...")
 
     try:
-        stream = sdk.grpc()
+        stream = sdk.grpc
         stream.on_error = on_error
         stream.trades(["BTC", "ETH"], on_trade)
 

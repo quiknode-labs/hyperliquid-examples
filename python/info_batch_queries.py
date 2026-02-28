@@ -30,9 +30,9 @@ def main():
     print("Multi-User Queries")
     print("=" * 50)
 
-    # Single SDK instance - access everything through sdk.info(), sdk.core(), sdk.evm()
+    # Single SDK instance - access everything through sdk.info, sdk.core, sdk.evm
     sdk = HyperliquidSDK(ENDPOINT)
-    info = sdk.info()
+    info = sdk.info
 
     # Example addresses (use real addresses with activity for better demo)
     addresses = [

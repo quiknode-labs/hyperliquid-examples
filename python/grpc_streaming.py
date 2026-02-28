@@ -107,7 +107,7 @@ def main():
 
     # Create SDK and get gRPC stream
     sdk = HyperliquidSDK(ENDPOINT)
-    stream = sdk.grpc()
+    stream = sdk.grpc
 
     # Configure callbacks
     stream.on_error = on_error

@@ -55,7 +55,7 @@ def main():
 
     # Create SDK client
     sdk = HyperliquidSDK(ENDPOINT)
-    stream = sdk.stream()
+    stream = sdk.stream
 
     def on_connect():
         print("[CONNECTED]")

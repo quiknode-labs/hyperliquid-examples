@@ -107,7 +107,7 @@ def main():
 
     # Create SDK client
     sdk = HyperliquidSDK(ENDPOINT)
-    grpc = sdk.grpc()
+    grpc = sdk.grpc
 
     def on_connect():
         print("[CONNECTED]")

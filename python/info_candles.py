@@ -34,9 +34,9 @@ def main():
     print("Historical Candles")
     print("=" * 50)
 
-    # Single SDK instance - access everything through sdk.info(), sdk.core(), sdk.evm()
+    # Single SDK instance - access everything through sdk.info, sdk.core, sdk.evm
     sdk = HyperliquidSDK(ENDPOINT)
-    info = sdk.info()
+    info = sdk.info
 
     # Last 24 hours
     now = int(time.time() * 1000)

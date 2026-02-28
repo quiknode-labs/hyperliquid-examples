@@ -32,9 +32,9 @@ def main():
     print("Market Data (Info API)")
     print("=" * 50)
 
-    # Single SDK instance - access everything through sdk.info(), sdk.core(), sdk.evm()
+    # Single SDK instance - access everything through sdk.info, sdk.core, sdk.evm
     sdk = HyperliquidSDK(ENDPOINT)
-    info = sdk.info()
+    info = sdk.info
 
     # Exchange metadata
     print("\n1. Exchange Metadata:")

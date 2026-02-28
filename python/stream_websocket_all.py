@@ -82,7 +82,7 @@ def demo_market_data():
 
     # Create SDK client
     sdk = HyperliquidSDK(ENDPOINT)
-    stream = sdk.stream()
+    stream = sdk.stream
 
     # trades: Real-time executed trades
     stream.trades(["BTC", "ETH"], make_callback("trades"))

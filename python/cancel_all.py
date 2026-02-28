@@ -34,7 +34,7 @@ def main():
 
     # Check open orders first
     orders = sdk.open_orders()
-    print(f"Open orders: {orders.count}")
+    print(f"Open orders: {orders['count']}")
 
     # Cancel all orders
     result = sdk.cancel_all()

@@ -34,11 +34,11 @@ def main():
 
     # Get all open orders
     result = sdk.open_orders()
-    print(f"Open orders: {result.count}")
+    print(f"Open orders: {result['count']}")
 
-    for o in result.orders:
-        side = "BUY" if o.side == "B" else "SELL"
-        print(f"  {o.name} {side} {o.sz} @ {o.limit_px} (OID: {o.oid})")
+    for o in result['orders']:
+        side = "BUY" if o.get('side') == "B" else "SELL"
+        print(f"  {o.get('coin')} {side} {o.get('sz')} @ {o.get('limitPx')} (OID: {o.get('oid')})")
 
     # Get order status for a specific order
     # status = sdk.order_status(12345)

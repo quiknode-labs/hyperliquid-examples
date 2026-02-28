@@ -50,7 +50,7 @@ def stream_l2_example():
     count = [0]
 
     sdk = HyperliquidSDK(ENDPOINT)
-    grpc = sdk.grpc()
+    grpc = sdk.grpc
 
     def on_l2_book(data):
         count[0] += 1
@@ -89,7 +89,7 @@ def stream_l4_example():
     count = [0]
 
     sdk = HyperliquidSDK(ENDPOINT)
-    grpc = sdk.grpc()
+    grpc = sdk.grpc
 
     def on_l4_book(data):
         count[0] += 1

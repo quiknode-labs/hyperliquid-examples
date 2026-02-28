@@ -98,7 +98,7 @@ def main():
 
     # Create SDK and get stream
     sdk = HyperliquidSDK(ENDPOINT)
-    stream = sdk.stream()
+    stream = sdk.stream
 
     # Configure callbacks
     stream.on_error = on_error

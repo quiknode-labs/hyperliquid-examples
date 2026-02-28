@@ -32,9 +32,9 @@ def main():
     print(f"User Data: {USER[:10]}...")
     print("=" * 50)
 
-    # Single SDK instance - access everything through sdk.info(), sdk.core(), sdk.evm()
+    # Single SDK instance - access everything through sdk.info, sdk.core, sdk.evm
     sdk = HyperliquidSDK(ENDPOINT)
-    info = sdk.info()
+    info = sdk.info
 
     # Clearinghouse state (positions + margin)
     print("\n1. Positions & Margin:")

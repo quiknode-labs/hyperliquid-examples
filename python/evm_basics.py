@@ -30,9 +30,9 @@ def main():
     print("HyperEVM (Ethereum JSON-RPC)")
     print("=" * 50)
 
-    # Single SDK instance - access everything through sdk.info(), sdk.core(), sdk.evm()
+    # Single SDK instance - access everything through sdk.info, sdk.core, sdk.evm
     sdk = HyperliquidSDK(ENDPOINT)
-    evm = sdk.evm()
+    evm = sdk.evm
 
     # Chain info
     print("\n1. Chain Info:")

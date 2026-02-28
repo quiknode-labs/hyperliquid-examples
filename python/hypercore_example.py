@@ -42,11 +42,11 @@ def main():
     print("-" * 30)
 
     # Get latest block number
-    block_num = sdk.core().latest_block_number()
+    block_num = sdk.core.latest_block_number()
     print(f"Latest block: {block_num}")
 
     # Get block by number
-    block = sdk.core().get_block(block_num)
+    block = sdk.core.get_block(block_num)
     if block:
         txs = block.get("transactions", [])
         print(f"Block {block_num}:")
@@ -61,7 +61,7 @@ def main():
     print("-" * 30)
 
     # Get latest trades (all coins)
-    trades = sdk.core().latest_trades(count=5)
+    trades = sdk.core.latest_trades(count=5)
     print(f"Last {len(trades)} trades:")
     for trade in trades[:5]:
         coin = trade.get("coin", "?")
@@ -72,7 +72,7 @@ def main():
     print()
 
     # Get trades for specific coin
-    btc_trades = sdk.core().latest_trades(coin="BTC", count=3)
+    btc_trades = sdk.core.latest_trades(coin="BTC", count=3)
     print(f"Last {len(btc_trades)} BTC trades:")
     for trade in btc_trades:
         px = trade.get("px", "?")
@@ -89,7 +89,7 @@ def main():
 
     try:
         # Get latest orders (all coins)
-        orders = sdk.core().latest_orders(count=5)
+        orders = sdk.core.latest_orders(count=5)
         print(f"Last {len(orders)} orders:")
         for order in orders[:5]:
             coin = order.get("coin", "?")
@@ -111,7 +111,7 @@ def main():
     try:
         # Get batch blocks
         start_block = max(0, block_num - 5)
-        blocks = sdk.core().get_batch_blocks(start_block, block_num)
+        blocks = sdk.core.get_batch_blocks(start_block, block_num)
         print(f"Blocks {start_block} to {block_num}: {len(blocks)} blocks")
 
         # Safely count transactions
