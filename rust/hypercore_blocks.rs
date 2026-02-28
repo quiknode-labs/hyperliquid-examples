@@ -1,13 +1,10 @@
 //! HyperCore Block Data Example
 //!
-//! Shows how to get real-time trades, orders, and block data via the HyperCore API.
-//!
-//! This is the alternative to Info methods (allMids, l2Book, recentTrades) that
-//! are not available on QuickNode endpoints.
+//! Fetch block data from HyperCore using native API.
 //!
 //! # Usage
 //! ```bash
-//! export ENDPOINT=https://your-endpoint.hype-mainnet.quiknode.pro/TOKEN
+//! export ENDPOINT="https://your-endpoint.hype-mainnet.quiknode.pro/TOKEN"
 //! cargo run --example hypercore_blocks
 //! ```
 
@@ -15,72 +12,73 @@ use hyperliquid_sdk::HyperliquidSDK;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tracing_subscriber::fmt::init();
+    let endpoint = std::env::var("ENDPOINT").ok();
 
-    let endpoint = std::env::var("ENDPOINT").expect("Set ENDPOINT environment variable");
-
-    let sdk = HyperliquidSDK::new()
-        .endpoint(&endpoint)
-        .build()
-        .await?;
-
-    println!("==================================================");
-    println!("HyperCore Block Data");
-    println!("==================================================");
-
-    // Latest block number
-    println!("\n1. Latest Block:");
-    let block_num = sdk.core().latest_block_number().await?;
-    println!("   Block #{}", block_num);
-
-    // Recent trades
-    println!("\n2. Recent Trades (all coins):");
-    let trades = sdk.core().latest_trades(5, None).await?;
-    if let Some(arr) = trades.as_array() {
-        for t in arr.iter().take(5) {
-            let side = if t.get("side").and_then(|v| v.as_str()) == Some("B") { "BUY" } else { "SELL" };
-            let sz = t.get("sz").and_then(|v| v.as_str()).unwrap_or("?");
-            let coin = t.get("coin").and_then(|v| v.as_str()).unwrap_or("?");
-            let px = t.get("px").and_then(|v| v.as_str()).unwrap_or("?");
-            println!("   {} {} {} @ ${}", side, sz, coin, px);
-        }
+    if endpoint.is_none() {
+        eprintln!("Usage:");
+        eprintln!("  export ENDPOINT='https://your-endpoint.hype-mainnet.quiknode.pro/TOKEN'");
+        eprintln!("  cargo run --example hypercore_blocks");
+        std::process::exit(1);
     }
 
-    // Recent BTC trades only
-    println!("\n3. BTC Trades:");
-    let btc_trades = sdk.core().latest_trades(10, Some("BTC")).await?;
-    if let Some(arr) = btc_trades.as_array() {
-        if arr.is_empty() {
-            println!("   No BTC trades in recent blocks");
-        } else {
-            for t in arr.iter().take(3) {
-                let side = if t.get("side").and_then(|v| v.as_str()) == Some("B") { "BUY" } else { "SELL" };
-                let sz = t.get("sz").and_then(|v| v.as_str()).unwrap_or("?");
-                let px = t.get("px").and_then(|v| v.as_str()).unwrap_or("?");
-                println!("   {} {} @ ${}", side, sz, px);
+    println!("HyperCore Block Data Example");
+    println!("{}", "=".repeat(50));
+
+    let mut builder = HyperliquidSDK::new();
+    if let Some(ep) = &endpoint {
+        builder = builder.endpoint(ep);
+    }
+    let sdk = builder.build().await?;
+    let core = sdk.core();
+
+    // Get latest block number
+    println!("\n1. Latest Block Number:");
+    match core.latest_block_number(None).await {
+        Ok(height) => {
+            println!("   Height: {}", height);
+        }
+        Err(e) => println!("   Error: {}", e),
+    }
+
+    // Get latest blocks
+    println!("\n2. Latest Blocks (last 5):");
+    match core.latest_blocks(None, Some(5)).await {
+        Ok(blocks) => {
+            if let Some(arr) = blocks.as_array() {
+                for (i, block) in arr.iter().enumerate() {
+                    let height = block.get("height").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let hash = block.get("hash").and_then(|v| v.as_str()).unwrap_or("?");
+                    let display_hash = if hash.len() > 16 {
+                        format!("{}...", &hash[..16])
+                    } else {
+                        hash.to_string()
+                    };
+                    println!("   [{}] Block {}: {}", i + 1, height, display_hash);
+                }
             }
         }
+        Err(e) => println!("   Error: {}", e),
     }
 
-    // Get a specific block
-    println!("\n4. Get Block Data:");
-    let block = sdk.core().get_block(block_num - 1).await?;
-    println!("   Block #{}", block_num - 1);
-    if let Some(time) = block.get("block_time").and_then(|v| v.as_str()) {
-        println!("   Time: {}", time);
-    }
-    if let Some(events) = block.get("events").and_then(|v| v.as_array()) {
-        println!("   Events: {}", events.len());
+    // Get block transactions
+    println!("\n3. Block Transaction Info:");
+    match core.latest_blocks(None, Some(1)).await {
+        Ok(blocks) => {
+            if let Some(arr) = blocks.as_array() {
+                if let Some(block) = arr.first() {
+                    let height = block.get("height").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let txs = block.get("transactions").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0);
+                    let time = block.get("timestamp").and_then(|v| v.as_u64()).unwrap_or(0);
+                    println!("   Block: {}", height);
+                    println!("   Transactions: {}", txs);
+                    println!("   Timestamp: {}", time);
+                }
+            }
+        }
+        Err(e) => println!("   Error: {}", e),
     }
 
-    // Get batch of blocks
-    println!("\n5. Batch Blocks:");
-    let blocks = sdk.core().get_batch_blocks(block_num - 5, block_num - 1).await?;
-    if let Some(arr) = blocks.get("blocks").and_then(|v| v.as_array()) {
-        println!("   Retrieved {} blocks", arr.len());
-    }
-
-    println!("\n==================================================");
+    println!("\n{}", "=".repeat(50));
     println!("Done!");
 
     Ok(())

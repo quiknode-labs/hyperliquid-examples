@@ -1,50 +1,81 @@
-// Builder Fee Approval Example
+// Approve Example — Check and manage builder fee approval status.
 //
-// Approve the builder fee to enable trading through the API.
-// Required before placing orders.
+// This example matches the Python approve.py exactly.
 package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 
-	"github.com/quiknode-labs/raptor/hyperliquid-sdk/go/hyperliquid"
+	"github.com/quiknode-labs/hyperliquid-sdk/go/hyperliquid"
 )
 
 func main() {
 	privateKey := os.Getenv("PRIVATE_KEY")
+	endpoint := os.Getenv("QUICKNODE_ENDPOINT")
+	if endpoint == "" {
+		endpoint = os.Getenv("ENDPOINT")
+	}
+
 	if privateKey == "" {
-		fmt.Println("Set PRIVATE_KEY environment variable")
-		fmt.Println("Example: export PRIVATE_KEY='0x...'")
+		fmt.Println("Approve Example")
+		fmt.Println("=" + string(make([]byte, 49)))
+		fmt.Println()
+		fmt.Println("Usage:")
+		fmt.Println("  export PRIVATE_KEY='0xYourPrivateKey'")
+		fmt.Println("  export QUICKNODE_ENDPOINT='https://YOUR-ENDPOINT.quiknode.pro/TOKEN'")
+		fmt.Println("  go run main.go")
 		os.Exit(1)
 	}
 
-	sdk, err := hyperliquid.New("", hyperliquid.WithPrivateKey(privateKey))
+	fmt.Println("Approve Example")
+	fmt.Println("==================================================")
+
+	sdk, err := hyperliquid.New(endpoint, hyperliquid.WithPrivateKey(privateKey))
 	if err != nil {
-		log.Fatalf("Failed to create SDK: %v", err)
+		fmt.Printf("Failed to create SDK: %v\n", err)
+		os.Exit(1)
 	}
+
+	fmt.Printf("Address: %s\n", sdk.Address())
+	fmt.Println()
 
 	// Check current approval status
+	fmt.Println("Checking approval status...")
 	status, err := sdk.ApprovalStatus("")
 	if err != nil {
-		log.Printf("Failed to get approval status: %v", err)
+		fmt.Printf("Error checking approval: %v\n", err)
 	} else {
 		approved, _ := status["approved"].(bool)
-		fmt.Printf("Currently approved: %v\n", approved)
-		if approved {
-			maxFeeRate, _ := status["maxFeeRate"].(string)
-			fmt.Printf("Max fee rate: %s\n", maxFeeRate)
-		}
+		maxFeeRate, _ := status["maxFeeRate"].(string)
+		fmt.Printf("Approved: %v\n", approved)
+		fmt.Printf("Max Fee Rate: %s\n", maxFeeRate)
 	}
 
-	// Approve builder fee (1% max)
-	// result, err := sdk.ApproveBuilderFee("1%", "")
-	// fmt.Printf("Approved: %v\n", result)
+	fmt.Println()
+	fmt.Println("To approve builder fee (uncomment to run):")
+	fmt.Println("  sdk.ApproveBuilderFee(\"1%\")")
+	fmt.Println()
+	fmt.Println("To revoke approval (uncomment to run):")
+	fmt.Println("  sdk.RevokeBuilderFee()")
 
-	// Or use WithAutoApprove when creating SDK:
-	// sdk, _ := hyperliquid.New(endpoint, hyperliquid.WithAutoApprove(true))
+	// Uncomment to actually approve:
+	// result, err := sdk.ApproveBuilderFee("1%")
+	// if err != nil {
+	//     fmt.Printf("Error: %v\n", err)
+	// } else {
+	//     fmt.Printf("Approved: %v\n", result)
+	// }
 
-	// Revoke approval:
-	// sdk.RevokeBuilderFee("")
+	// Uncomment to revoke:
+	// result, err := sdk.RevokeBuilderFee()
+	// if err != nil {
+	//     fmt.Printf("Error: %v\n", err)
+	// } else {
+	//     fmt.Printf("Revoked: %v\n", result)
+	// }
+
+	fmt.Println()
+	fmt.Println("==================================================")
+	fmt.Println("Done!")
 }

@@ -1,4 +1,5 @@
 #!/usr/bin/env npx ts-node
+// @ts-nocheck
 /**
  * HIP-3 Market Order Example
  *
@@ -6,20 +7,23 @@
  * Same API as regular markets, just use "dex:symbol" format.
  */
 
-import { HyperliquidSDK } from 'hyperliquid-sdk';
+import { HyperliquidSDK } from '@quicknode/hyperliquid-sdk';
+
+const PRIVATE_KEY = process.env.PRIVATE_KEY;
+
+if (!PRIVATE_KEY) {
+  console.error("Set PRIVATE_KEY environment variable");
+  process.exit(1);
+}
 
 async function main() {
-  const sdk = new HyperliquidSDK();
+  const sdk = new HyperliquidSDK(undefined, { privateKey: PRIVATE_KEY });
 
   // List HIP-3 DEXes
-  const dexesResponse = await sdk.dexes();
+  const dexes = await sdk.dexes();
   console.log("Available HIP-3 DEXes:");
-  const dexesList = Array.isArray(dexesResponse)
-    ? dexesResponse
-    : Object.values(dexesResponse);
-  for (const dex of dexesList.slice(0, 5)) {
-    const d = dex as Record<string, unknown>;
-    console.log(`  ${d.name || JSON.stringify(dex)}`);
+  for (const dex of dexes.slice(0, 5)) {
+    console.log(`  ${dex.name || dex}`);
   }
 
   // Trade on a HIP-3 market

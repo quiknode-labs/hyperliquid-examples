@@ -1,46 +1,99 @@
 //! Preflight Validation Example
 //!
-//! Validate an order BEFORE signing to catch tick size and lot size errors.
-//! Saves failed transactions by checking validity upfront.
-//!
-//! No endpoint or private key needed — uses public API.
+//! Validate orders before sending to the exchange.
 //!
 //! # Usage
 //! ```bash
+//! export ENDPOINT="https://your-endpoint.hype-mainnet.quiknode.pro/TOKEN"
+//! export PRIVATE_KEY="0x..."
 //! cargo run --example preflight
 //! ```
 
-use hyperliquid_sdk::HyperliquidSDK;
+use hyperliquid_sdk::{HyperliquidSDK, Side};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tracing_subscriber::fmt::init();
+    let endpoint = std::env::var("ENDPOINT").ok();
+    let private_key = std::env::var("PRIVATE_KEY").ok();
 
-    // No endpoint or private key needed for read-only public queries
-    let sdk = HyperliquidSDK::new().build().await?;
+    if endpoint.is_none() || private_key.is_none() {
+        eprintln!("Usage:");
+        eprintln!("  export ENDPOINT='https://your-endpoint.hype-mainnet.quiknode.pro/TOKEN'");
+        eprintln!("  export PRIVATE_KEY='0x...'");
+        eprintln!("  cargo run --example preflight");
+        std::process::exit(1);
+    }
+
+    println!("Preflight Validation Example");
+    println!("{}", "=".repeat(50));
+
+    let mut builder = HyperliquidSDK::new();
+    if let Some(ep) = &endpoint {
+        builder = builder.endpoint(ep);
+    }
+    if let Some(pk) = &private_key {
+        builder = builder.private_key(pk);
+    }
+    let sdk = builder.build().await?;
+
+    if let Some(addr) = sdk.address() {
+        println!("Address: {}", addr);
+    }
 
     // Get current price
     let mid = sdk.get_mid("BTC").await?;
-    println!("BTC mid: ${:.2}", mid);
+    println!("\nBTC mid price: ${:.2}", mid);
 
-    // Validate a good order
-    let limit_price = (mid * 0.97) as i64;
-    let result = sdk.preflight("BTC", "buy", Some(limit_price as f64), Some(0.001)).await?;
-    println!("Valid order: {:?}", result);
-
-    // Validate an order with too many decimals (will fail)
-    let result = sdk.preflight("BTC", "buy", Some(67000.123456789), Some(0.001)).await?;
-    println!("Invalid price: {:?}", result);
-
-    let valid = result.get("valid").and_then(|v| v.as_bool()).unwrap_or(true);
-    if !valid {
-        if let Some(error) = result.get("error").and_then(|v| v.as_str()) {
-            println!("  Error: {}", error);
+    // Valid order
+    println!("\n1. Valid Order Check:");
+    let limit_price = mid * 0.97;
+    match sdk.preflight("BTC", Side::Buy, limit_price, 0.001).await {
+        Ok(result) => {
+            let valid = result.get("valid").and_then(|v| v.as_bool()).unwrap_or(false);
+            println!("   Valid: {}", valid);
+            if let Some(errors) = result.get("errors").and_then(|v| v.as_array()) {
+                if !errors.is_empty() {
+                    println!("   Errors: {:?}", errors);
+                }
+            }
         }
-        if let Some(suggestion) = result.get("suggestion").and_then(|v| v.as_str()) {
-            println!("  Suggestion: {}", suggestion);
-        }
+        Err(e) => println!("   Error: {}", e),
     }
+
+    // Invalid size (too small)
+    println!("\n2. Invalid Size Check (too small):");
+    match sdk.preflight("BTC", Side::Buy, limit_price, 0.0000001).await {
+        Ok(result) => {
+            let valid = result.get("valid").and_then(|v| v.as_bool()).unwrap_or(false);
+            println!("   Valid: {}", valid);
+            if let Some(errors) = result.get("errors").and_then(|v| v.as_array()) {
+                if !errors.is_empty() {
+                    println!("   Errors: {:?}", errors);
+                }
+            }
+        }
+        Err(e) => println!("   Error: {}", e),
+    }
+
+    // Invalid price (negative)
+    println!("\n3. Invalid Price Check (negative):");
+    match sdk.preflight("BTC", Side::Buy, -1000.0, 0.001).await {
+        Ok(result) => {
+            let valid = result.get("valid").and_then(|v| v.as_bool()).unwrap_or(false);
+            println!("   Valid: {}", valid);
+        }
+        Err(e) => println!("   Error: {}", e),
+    }
+
+    println!("\n{}", "-".repeat(50));
+    println!("Preflight Benefits:");
+    println!("  - Catch errors before sending to exchange");
+    println!("  - Validate size and price formatting");
+    println!("  - Check margin requirements");
+    println!("  - No gas cost for validation");
+
+    println!("\n{}", "=".repeat(50));
+    println!("Done!");
 
     Ok(())
 }

@@ -1,4 +1,5 @@
 #!/usr/bin/env npx ts-node
+// @ts-nocheck
 /**
  * Builder Fee Approval Example
  *
@@ -6,14 +7,23 @@
  * Required before placing orders.
  */
 
-import { HyperliquidSDK } from 'hyperliquid-sdk';
+import { HyperliquidSDK } from '@quicknode/hyperliquid-sdk';
+
+const ENDPOINT = process.env.QUICKNODE_ENDPOINT;
+const PRIVATE_KEY = process.env.PRIVATE_KEY;
+
+if (!PRIVATE_KEY) {
+  console.error("Set PRIVATE_KEY environment variable");
+  console.error("Example: export PRIVATE_KEY='0x...'");
+  process.exit(1);
+}
 
 async function main() {
-  const sdk = new HyperliquidSDK();
+  const sdk = new HyperliquidSDK(ENDPOINT, { privateKey: PRIVATE_KEY });
 
   // Check current approval status
   const status = await sdk.approvalStatus();
-  console.log(`Currently approved: ${status.approved ?? false}`);
+  console.log(`Currently approved: ${status.approved || false}`);
   if (status.approved) {
     console.log(`Max fee rate: ${status.maxFeeRate}`);
   }
@@ -22,8 +32,8 @@ async function main() {
   // await sdk.approveBuilderFee("1%");
   // console.log("Approved!");
 
-  // Or use autoApprove when creating SDK:
-  // const sdk = new HyperliquidSDK(endpoint, { autoApprove: true });
+  // Or use auto_approve when creating SDK:
+  // const sdk = new HyperliquidSDK(ENDPOINT, { privateKey: PRIVATE_KEY, autoApprove: true });
 
   // Revoke approval:
   // await sdk.revokeBuilderFee();

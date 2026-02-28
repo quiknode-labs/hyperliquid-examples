@@ -1,10 +1,10 @@
-//! Multi-User Queries Example
+//! Info API Batch Queries Example
 //!
-//! Shows how to query multiple users' states efficiently.
+//! Efficiently fetch multiple pieces of data.
 //!
 //! # Usage
 //! ```bash
-//! export ENDPOINT=https://your-endpoint.hype-mainnet.quiknode.pro/TOKEN
+//! export ENDPOINT="https://your-endpoint.hype-mainnet.quiknode.pro/TOKEN"
 //! cargo run --example info_batch_queries
 //! ```
 
@@ -12,83 +12,98 @@ use hyperliquid_sdk::HyperliquidSDK;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tracing_subscriber::fmt::init();
+    let endpoint = std::env::var("ENDPOINT").ok();
 
-    let endpoint = std::env::var("ENDPOINT").expect("Set ENDPOINT environment variable");
-
-    let sdk = HyperliquidSDK::new()
-        .endpoint(&endpoint)
-        .build()
-        .await?;
-
-    println!("==================================================");
-    println!("Multi-User Queries");
-    println!("==================================================");
-
-    // Example addresses (use real addresses with activity for better demo)
-    let addresses = [
-        "0x2ba553d9f990a3b66b03b2dc0d030dfc1c061036",  // Active trader
-        "0x0000000000000000000000000000000000000001",
-        "0x0000000000000000000000000000000000000002",
-    ];
-
-    println!("\nQuerying {} user accounts...", addresses.len());
-
-    // Query each user's clearinghouse state
-    println!("\n1. User Account States:");
-    for addr in &addresses {
-        match sdk.info().clearinghouse_state(addr).await {
-            Ok(state) => {
-                let value = state
-                    .get("marginSummary")
-                    .and_then(|m| m.get("accountValue"))
-                    .and_then(|v| v.as_str())
-                    .and_then(|s| s.parse::<f64>().ok())
-                    .unwrap_or(0.0);
-                let positions = state
-                    .get("assetPositions")
-                    .and_then(|v| v.as_array())
-                    .map(|a| a.len())
-                    .unwrap_or(0);
-                println!("   {}...: ${:.2} ({} positions)", &addr[..12], value, positions);
-            }
-            Err(e) => {
-                println!("   {}...: Error - {}", &addr[..12], e);
-            }
-        }
+    if endpoint.is_none() {
+        eprintln!("Usage:");
+        eprintln!("  export ENDPOINT='https://your-endpoint.hype-mainnet.quiknode.pro/TOKEN'");
+        eprintln!("  cargo run --example info_batch_queries");
+        std::process::exit(1);
     }
 
-    // Query open orders for first user
-    println!("\n2. Open Orders (first user):");
-    match sdk.info().open_orders(addresses[0]).await {
-        Ok(orders) => {
-            if let Some(arr) = orders.as_array() {
-                println!("   {} open orders", arr.len());
-                for o in arr.iter().take(3) {
-                    let coin = o.get("coin").and_then(|v| v.as_str()).unwrap_or("?");
-                    let side = if o.get("side").and_then(|v| v.as_str()) == Some("B") { "BUY" } else { "SELL" };
-                    let sz = o.get("sz").and_then(|v| v.as_str()).unwrap_or("?");
-                    let px = o.get("limitPx").and_then(|v| v.as_str()).unwrap_or("?");
-                    println!("   - {}: {} {} @ {}", coin, side, sz, px);
+    println!("Info API Batch Queries Example");
+    println!("{}", "=".repeat(50));
+
+    let mut builder = HyperliquidSDK::new();
+    if let Some(ep) = &endpoint {
+        builder = builder.endpoint(ep);
+    }
+    let sdk = builder.build().await?;
+    let info = sdk.info();
+
+    // Get all mid prices
+    println!("\n1. All Mid Prices:");
+    match info.all_mids(None).await {
+        Ok(mids) => {
+            let assets = ["BTC", "ETH", "SOL", "DOGE", "ARB"];
+            for asset in &assets {
+                if let Some(mid) = mids.get(*asset).and_then(|v| v.as_str()) {
+                    println!("   {}: ${}", asset, mid);
                 }
             }
         }
         Err(e) => println!("   Error: {}", e),
     }
 
-    // Query user fees
-    println!("\n3. Fee Structure (first user):");
-    match sdk.info().user_fees(addresses[0]).await {
-        Ok(fees) => {
-            let maker = fees.get("makerRate").and_then(|v| v.as_str()).unwrap_or("N/A");
-            let taker = fees.get("takerRate").and_then(|v| v.as_str()).unwrap_or("N/A");
-            println!("   Maker: {}", maker);
-            println!("   Taker: {}", taker);
+    // Get exchange metadata
+    println!("\n2. Exchange Metadata:");
+    match info.meta().await {
+        Ok(meta) => {
+            if let Some(universe) = meta.get("universe").and_then(|v| v.as_array()) {
+                println!("   Perp markets: {}", universe.len());
+            }
         }
         Err(e) => println!("   Error: {}", e),
     }
 
-    println!("\n==================================================");
+    match info.spot_meta().await {
+        Ok(spot) => {
+            if let Some(tokens) = spot.get("tokens").and_then(|v| v.as_array()) {
+                println!("   Spot tokens: {}", tokens.len());
+            }
+        }
+        Err(e) => println!("   Error: {}", e),
+    }
+
+    // Get L2 orderbook for multiple assets
+    println!("\n3. Orderbook Spreads:");
+    for asset in &["BTC", "ETH", "SOL"] {
+        match info.l2_book(asset, None, None).await {
+            Ok(book) => {
+                if let Some(levels) = book.get("levels").and_then(|v| v.as_array()) {
+                    if levels.len() >= 2 {
+                        let bids = levels[0].as_array();
+                        let asks = levels[1].as_array();
+                        if let (Some(bids), Some(asks)) = (bids, asks) {
+                            if let (Some(bid), Some(ask)) = (bids.first(), asks.first()) {
+                                let bid_px = bid.get("px").and_then(|v| v.as_str()).unwrap_or("?");
+                                let ask_px = ask.get("px").and_then(|v| v.as_str()).unwrap_or("?");
+                                println!("   {}: bid={} ask={}", asset, bid_px, ask_px);
+                            }
+                        }
+                    }
+                }
+            }
+            Err(e) => println!("   {}: Error - {}", asset, e),
+        }
+    }
+
+    // Get predicted funding rates
+    println!("\n4. Predicted Funding Rates:");
+    match info.predicted_fundings().await {
+        Ok(fundings) => {
+            if let Some(arr) = fundings.as_array() {
+                for (i, funding) in arr.iter().take(5).enumerate() {
+                    let asset = funding.get("asset").and_then(|v| v.as_str()).unwrap_or("?");
+                    let rate = funding.get("predictedFunding").and_then(|v| v.as_str()).unwrap_or("?");
+                    println!("   [{}] {}: {}", i + 1, asset, rate);
+                }
+            }
+        }
+        Err(e) => println!("   Error: {}", e),
+    }
+
+    println!("\n{}", "=".repeat(50));
     println!("Done!");
 
     Ok(())

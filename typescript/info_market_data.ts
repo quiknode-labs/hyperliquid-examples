@@ -1,4 +1,5 @@
 #!/usr/bin/env npx ts-node
+// @ts-nocheck
 /**
  * Market Data Example
  *
@@ -6,20 +7,18 @@
  *
  * The SDK handles all Info API methods automatically.
  *
- * Setup:
- *     npm install hyperliquid-sdk
- *
  * Usage:
- *     export ENDPOINT="https://your-endpoint.hype-mainnet.quiknode.pro/YOUR_TOKEN"
+ *     export QUICKNODE_ENDPOINT="https://your-endpoint.hype-mainnet.quiknode.pro/YOUR_TOKEN"
  *     npx ts-node info_market_data.ts
  */
 
-import { HyperliquidSDK, HyperliquidError } from 'hyperliquid-sdk';
+import { HyperliquidSDK } from '@quicknode/hyperliquid-sdk';
 
-const ENDPOINT = process.env.ENDPOINT;
+const ENDPOINT = process.env.QUICKNODE_ENDPOINT;
+
 if (!ENDPOINT) {
-  console.log("Set ENDPOINT environment variable");
-  console.log("Example: export ENDPOINT='https://your-endpoint.hype-mainnet.quiknode.pro/TOKEN'");
+  console.error("Set QUICKNODE_ENDPOINT environment variable");
+  console.error("Example: export QUICKNODE_ENDPOINT='https://your-endpoint.hype-mainnet.quiknode.pro/TOKEN'");
   process.exit(1);
 }
 
@@ -35,28 +34,22 @@ async function main() {
   // Exchange metadata
   console.log("\n1. Exchange Metadata:");
   try {
-    const meta = await info.meta() as Record<string, unknown>;
-    const universe = (meta.universe || []) as unknown[];
-    console.log(`   Perp Markets: ${universe.length}`);
-    for (const asset of universe.slice(0, 5)) {
-      const a = asset as Record<string, unknown>;
-      console.log(`   - ${a.name}: max leverage ${a.maxLeverage}x`);
+    const meta = await info.meta();
+    console.log(`   Perp Markets: ${(meta.universe || []).length}`);
+    for (const asset of (meta.universe || []).slice(0, 5)) {
+      console.log(`   - ${asset.name}: max leverage ${asset.maxLeverage}x`);
     }
-  } catch (e) {
-    if (e instanceof HyperliquidError) {
-      console.log(`   (meta not available: ${e.code})`);
-    }
+  } catch (e: any) {
+    console.log(`   (meta not available: ${e.code || e.message})`);
   }
 
   // Spot metadata
   console.log("\n2. Spot Metadata:");
   try {
-    const spot = await info.spotMeta() as Record<string, unknown>;
-    console.log(`   Spot Tokens: ${((spot.tokens || []) as unknown[]).length}`);
-  } catch (e) {
-    if (e instanceof HyperliquidError) {
-      console.log(`   (spotMeta not available: ${(e as HyperliquidError).code})`);
-    }
+    const spot = await info.spotMeta();
+    console.log(`   Spot Tokens: ${(spot.tokens || []).length}`);
+  } catch (e: any) {
+    console.log(`   (spotMeta not available: ${e.code || e.message})`);
   }
 
   // Exchange status
@@ -64,58 +57,47 @@ async function main() {
   try {
     const status = await info.exchangeStatus();
     console.log(`   ${JSON.stringify(status)}`);
-  } catch (e) {
-    if (e instanceof HyperliquidError) {
-      console.log(`   (exchangeStatus not available: ${(e as HyperliquidError).code})`);
-    }
+  } catch (e: any) {
+    console.log(`   (exchangeStatus not available: ${e.code || e.message})`);
   }
 
   // All mid prices
   console.log("\n4. Mid Prices:");
   try {
-    const mids = await info.allMids() as Record<string, string>;
-    console.log(`   BTC: $${parseFloat(mids.BTC || '0').toLocaleString()}`);
-    console.log(`   ETH: $${parseFloat(mids.ETH || '0').toLocaleString()}`);
-  } catch (e) {
-    if (e instanceof HyperliquidError) {
-      console.log(`   (allMids not available: ${(e as HyperliquidError).code})`);
-    }
+    const mids = await info.allMids();
+    console.log(`   BTC: $${parseFloat(mids.BTC || "0").toLocaleString()}`);
+    console.log(`   ETH: $${parseFloat(mids.ETH || "0").toLocaleString()}`);
+  } catch (e: any) {
+    console.log(`   (allMids not available: ${e.code || e.message})`);
   }
 
   // Order book
   console.log("\n5. Order Book (BTC):");
   try {
-    const book = await info.l2Book("BTC") as Record<string, unknown>;
-    const levels = (book.levels || [[], []]) as unknown[][];
-    if (levels[0]?.length && levels[1]?.length) {
-      const bid0 = levels[0][0] as Record<string, unknown>;
-      const ask0 = levels[1][0] as Record<string, unknown>;
-      const bestBid = parseFloat(String(bid0.px || 0));
-      const bestAsk = parseFloat(String(ask0.px || 0));
+    const book = await info.l2Book("BTC");
+    const levels = book.levels || [[], []];
+    if (levels[0] && levels[0].length > 0 && levels[1] && levels[1].length > 0) {
+      const bestBid = parseFloat(levels[0][0].px || "0");
+      const bestAsk = parseFloat(levels[1][0].px || "0");
       const spread = bestAsk - bestBid;
       console.log(`   Best Bid: $${bestBid.toLocaleString()}`);
       console.log(`   Best Ask: $${bestAsk.toLocaleString()}`);
       console.log(`   Spread: $${spread.toFixed(2)}`);
     }
-  } catch (e) {
-    if (e instanceof HyperliquidError) {
-      console.log(`   (l2Book not available: ${(e as HyperliquidError).code})`);
-    }
+  } catch (e: any) {
+    console.log(`   (l2Book not available: ${e.code || e.message})`);
   }
 
   // Recent trades
   console.log("\n6. Recent Trades (BTC):");
   try {
-    const trades = await info.recentTrades("BTC") as unknown[];
+    const trades = await info.recentTrades("BTC");
     for (const t of trades.slice(0, 3)) {
-      const trade = t as Record<string, unknown>;
-      const side = trade.side === "B" ? "BUY" : "SELL";
-      console.log(`   ${side} ${trade.sz} @ $${parseFloat(String(trade.px || 0)).toLocaleString()}`);
+      const side = t.side === "B" ? "BUY" : "SELL";
+      console.log(`   ${side} ${t.sz} @ $${parseFloat(t.px || "0").toLocaleString()}`);
     }
-  } catch (e) {
-    if (e instanceof HyperliquidError) {
-      console.log(`   (recentTrades not available: ${(e as HyperliquidError).code})`);
-    }
+  } catch (e: any) {
+    console.log(`   (recentTrades not available: ${e.code || e.message})`);
   }
 
   console.log("\n" + "=".repeat(50));

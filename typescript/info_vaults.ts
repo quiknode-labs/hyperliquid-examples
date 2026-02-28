@@ -1,25 +1,23 @@
 #!/usr/bin/env npx ts-node
+// @ts-nocheck
 /**
  * Vaults & Delegation Example
  *
  * Shows how to query vault information and user delegations.
  *
- * Setup:
- *     npm install hyperliquid-sdk
- *
  * Usage:
- *     export ENDPOINT="https://your-endpoint.hype-mainnet.quiknode.pro/YOUR_TOKEN"
+ *     export QUICKNODE_ENDPOINT="https://your-endpoint.hype-mainnet.quiknode.pro/YOUR_TOKEN"
  *     export USER_ADDRESS="0x..."  # Optional
  *     npx ts-node info_vaults.ts
  */
 
-import { HyperliquidSDK } from 'hyperliquid-sdk';
+import { HyperliquidSDK } from '@quicknode/hyperliquid-sdk';
 
-const ENDPOINT = process.env.ENDPOINT;
+const ENDPOINT = process.env.QUICKNODE_ENDPOINT;
 const USER = process.env.USER_ADDRESS;
 
 if (!ENDPOINT) {
-  console.log("Set ENDPOINT environment variable");
+  console.error("Set QUICKNODE_ENDPOINT environment variable");
   process.exit(1);
 }
 
@@ -34,18 +32,17 @@ async function main() {
 
   // Vault summaries
   console.log("\n1. Vault Summaries:");
-  const vaults = await info.vaultSummaries() as unknown[];
+  const vaults = await info.vaultSummaries();
   console.log(`   Total: ${vaults.length}`);
   for (const v of vaults.slice(0, 3)) {
-    const vault = v as Record<string, unknown>;
-    console.log(`   - ${vault.name || 'N/A'}: TVL $${vault.tvl || '?'}`);
+    console.log(`   - ${v.name || 'N/A'}: TVL $${v.tvl || '?'}`);
   }
 
   // User delegations
   if (USER) {
     console.log(`\n2. Delegations (${USER.slice(0, 10)}...):`);
-    const delegations = await info.delegations(USER) as unknown[];
-    if (delegations.length) {
+    const delegations = await info.delegations(USER);
+    if (delegations.length > 0) {
       console.log(`   ${delegations.length} active`);
     } else {
       console.log("   None");

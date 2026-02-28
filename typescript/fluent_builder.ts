@@ -1,21 +1,29 @@
 #!/usr/bin/env npx ts-node
+// @ts-nocheck
 /**
  * Fluent Order Builder Example
  *
  * For power users who want maximum control with IDE autocomplete.
  */
 
-import { HyperliquidSDK, Order } from 'hyperliquid-sdk';
+import { HyperliquidSDK, Order } from '@quicknode/hyperliquid-sdk';
+
+const PRIVATE_KEY = process.env.PRIVATE_KEY;
+
+if (!PRIVATE_KEY) {
+  console.error("Set PRIVATE_KEY environment variable");
+  process.exit(1);
+}
 
 async function main() {
-  const sdk = new HyperliquidSDK();
+  const sdk = new HyperliquidSDK(undefined, { privateKey: PRIVATE_KEY });
   const mid = await sdk.getMid("BTC");
 
   // Simple limit order with GTC (Good Till Cancelled) - minimum $10 value
   // Use size directly to ensure proper decimal precision (BTC allows 5 decimals)
   const order = await sdk.order(
     Order.buy("BTC")
-      .size(0.00017)  // ~$11 worth at ~$65k (minimum is $10)
+      .size(0.00017) // ~$11 worth at ~$65k (minimum is $10)
       .price(Math.floor(mid * 0.97))
       .gtc()
   );

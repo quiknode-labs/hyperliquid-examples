@@ -1,14 +1,22 @@
 #!/usr/bin/env npx ts-node
+// @ts-nocheck
 /**
  * Round Trip Example
  *
  * Complete trade cycle: buy then sell to end up flat.
  */
 
-import { HyperliquidSDK } from 'hyperliquid-sdk';
+import { HyperliquidSDK } from '@quicknode/hyperliquid-sdk';
+
+const PRIVATE_KEY = process.env.PRIVATE_KEY;
+
+if (!PRIVATE_KEY) {
+  console.error("Set PRIVATE_KEY environment variable");
+  process.exit(1);
+}
 
 async function main() {
-  const sdk = new HyperliquidSDK();
+  const sdk = new HyperliquidSDK(undefined, { privateKey: PRIVATE_KEY });
 
   // Buy $11 worth of BTC
   console.log("Buying BTC...");

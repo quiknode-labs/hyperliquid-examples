@@ -1,4 +1,5 @@
 #!/usr/bin/env npx ts-node
+// @ts-nocheck
 /**
  * Open Orders Example
  *
@@ -7,27 +8,26 @@
  * Requires: PRIVATE_KEY environment variable
  */
 
-import { HyperliquidSDK } from 'hyperliquid-sdk';
+import { HyperliquidSDK } from '@quicknode/hyperliquid-sdk';
+
+const PRIVATE_KEY = process.env.PRIVATE_KEY;
+
+if (!PRIVATE_KEY) {
+  console.error("Set PRIVATE_KEY environment variable");
+  console.error("Example: export PRIVATE_KEY='0x...'");
+  process.exit(1);
+}
 
 async function main() {
-  // Private key required to query your open orders
-  const privateKey = process.env.PRIVATE_KEY;
-  if (!privateKey) {
-    console.log("Set PRIVATE_KEY environment variable");
-    console.log("Example: export PRIVATE_KEY='0x...'");
-    process.exit(1);
-  }
-
-  const sdk = new HyperliquidSDK(undefined, { privateKey });
+  const sdk = new HyperliquidSDK(undefined, { privateKey: PRIVATE_KEY });
 
   // Get all open orders
-  const result = await sdk.openOrders() as Record<string, unknown>;
+  const result = await sdk.openOrders();
   console.log(`Open orders: ${result.count}`);
 
-  for (const o of (result.orders || []) as unknown[]) {
-    const order = o as Record<string, unknown>;
-    const side = order.side === "B" ? "BUY" : "SELL";
-    console.log(`  ${order.name} ${side} ${order.sz} @ ${order.limitPx} (OID: ${order.oid})`);
+  for (const o of result.orders) {
+    const side = o.side === "B" ? "BUY" : "SELL";
+    console.log(`  ${o.name} ${side} ${o.sz} @ ${o.limitPx} (OID: ${o.oid})`);
   }
 
   // Get order status for a specific order

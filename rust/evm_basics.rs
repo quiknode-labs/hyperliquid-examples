@@ -1,10 +1,10 @@
-//! HyperEVM Example
+//! HyperEVM Basics Example
 //!
 //! Shows how to use standard Ethereum JSON-RPC calls on Hyperliquid's EVM chain.
 //!
 //! # Usage
 //! ```bash
-//! export ENDPOINT=https://your-endpoint.hype-mainnet.quiknode.pro/TOKEN
+//! export ENDPOINT="https://your-endpoint.hype-mainnet.quiknode.pro/TOKEN"
 //! cargo run --example evm_basics
 //! ```
 
@@ -12,48 +12,82 @@ use hyperliquid_sdk::HyperliquidSDK;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tracing_subscriber::fmt::init();
+    let endpoint = std::env::var("ENDPOINT").ok();
 
-    let endpoint = std::env::var("ENDPOINT").expect("Set ENDPOINT environment variable");
+    if endpoint.is_none() {
+        eprintln!("Usage:");
+        eprintln!("  export ENDPOINT='https://your-endpoint.hype-mainnet.quiknode.pro/TOKEN'");
+        eprintln!("  cargo run --example evm_basics");
+        std::process::exit(1);
+    }
 
-    let sdk = HyperliquidSDK::new()
-        .endpoint(&endpoint)
-        .build()
-        .await?;
+    println!("HyperEVM Basics Example");
+    println!("{}", "=".repeat(50));
 
-    println!("==================================================");
-    println!("HyperEVM (Ethereum JSON-RPC)");
-    println!("==================================================");
+    let mut builder = HyperliquidSDK::new();
+    if let Some(ep) = &endpoint {
+        builder = builder.endpoint(ep);
+    }
+    let sdk = builder.build().await?;
+    let evm = sdk.evm();
 
-    // Chain info
+    // Chain ID
     println!("\n1. Chain Info:");
-    let chain_id = sdk.evm().chain_id().await?;
-    let block_num = sdk.evm().block_number().await?;
-    let gas_price = sdk.evm().gas_price().await?;
-    println!("   Chain ID: {}", chain_id);
-    println!("   Block: {}", block_num);
-    println!("   Gas Price: {:.2} gwei", gas_price as f64 / 1e9);
+    match evm.chain_id().await {
+        Ok(chain_id) => println!("   Chain ID: {}", chain_id),
+        Err(e) => println!("   Error: {}", e),
+    }
+
+    // Block number
+    match evm.block_number().await {
+        Ok(block) => println!("   Block Number: {}", block),
+        Err(e) => println!("   Error: {}", e),
+    }
+
+    // Gas price
+    match evm.gas_price().await {
+        Ok(gas) => println!("   Gas Price: {} wei ({:.2} gwei)", gas, gas as f64 / 1e9),
+        Err(e) => println!("   Error: {}", e),
+    }
 
     // Latest block
     println!("\n2. Latest Block:");
-    if let Some(block) = sdk.evm().get_block_by_number("latest").await? {
-        if let Some(hash) = block.get("hash").and_then(|v| v.as_str()) {
-            println!("   Hash: {}...", &hash[..20.min(hash.len())]);
+    match evm.get_block_by_number("latest", false).await {
+        Ok(block) => {
+            let hash = block.get("hash").and_then(|v| v.as_str()).unwrap_or("?");
+            let number = block.get("number").and_then(|v| v.as_str()).unwrap_or("?");
+            let txs = block.get("transactions").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0);
+            if hash.len() > 20 {
+                println!("   Hash: {}...", &hash[..20]);
+            }
+            println!("   Number: {}", number);
+            println!("   Txs: {}", txs);
         }
-        if let Some(txs) = block.get("transactions").and_then(|v| v.as_array()) {
-            println!("   Txs: {}", txs.len());
-        }
+        Err(e) => println!("   Error: {}", e),
     }
 
-    // Check balance
+    // Balance check
     println!("\n3. Balance Check:");
     let addr = "0x0000000000000000000000000000000000000000";
-    let balance = sdk.evm().get_balance(addr).await?;
-    println!("   {}...: {:.6} ETH", &addr[..12], balance as f64 / 1e18);
+    match evm.get_balance(addr, Some("latest")).await {
+        Ok(balance) => {
+            // Parse hex string to u128
+            let balance_num = u128::from_str_radix(balance.trim_start_matches("0x"), 16).unwrap_or(0);
+            let eth = balance_num as f64 / 1e18;
+            println!("   {}...: {:.6} ETH", &addr[..12], eth);
+        }
+        Err(e) => println!("   Error: {}", e),
+    }
 
-    println!("\n==================================================");
+    // Transaction count
+    println!("\n4. Transaction Count:");
+    match evm.get_transaction_count(addr, Some("latest")).await {
+        Ok(count) => println!("   Nonce: {}", count),
+        Err(e) => println!("   Error: {}", e),
+    }
+
+    println!("\n{}", "=".repeat(50));
     println!("Done!");
-    println!("\nFor debug/trace APIs, use EVM with debug=true");
 
     Ok(())
 }

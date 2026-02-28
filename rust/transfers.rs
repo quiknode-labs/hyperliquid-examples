@@ -1,10 +1,11 @@
 //! Transfers Example
 //!
-//! Transfer USD and spot assets between accounts and wallets.
+//! Transfer funds between accounts.
 //!
 //! # Usage
 //! ```bash
-//! export PRIVATE_KEY=0x...
+//! export ENDPOINT="https://your-endpoint.hype-mainnet.quiknode.pro/TOKEN"
+//! export PRIVATE_KEY="0x..."
 //! cargo run --example transfers
 //! ```
 
@@ -12,56 +13,89 @@ use hyperliquid_sdk::HyperliquidSDK;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tracing_subscriber::fmt::init();
-
     let endpoint = std::env::var("ENDPOINT").ok();
+    let private_key = std::env::var("PRIVATE_KEY").ok();
 
-    let mut builder = HyperliquidSDK::new();
-    if let Some(ep) = endpoint {
-        builder = builder.endpoint(ep);
+    if endpoint.is_none() || private_key.is_none() {
+        eprintln!("Usage:");
+        eprintln!("  export ENDPOINT='https://your-endpoint.hype-mainnet.quiknode.pro/TOKEN'");
+        eprintln!("  export PRIVATE_KEY='0x...'");
+        eprintln!("  cargo run --example transfers");
+        std::process::exit(1);
     }
 
+    println!("Transfers Example");
+    println!("{}", "=".repeat(50));
+
+    let mut builder = HyperliquidSDK::new();
+    if let Some(ep) = &endpoint {
+        builder = builder.endpoint(ep);
+    }
+    if let Some(pk) = &private_key {
+        builder = builder.private_key(pk);
+    }
     let sdk = builder.build().await?;
 
-    println!("SDK initialized for address: {:?}", sdk.address());
+    if let Some(addr) = sdk.address() {
+        println!("Address: {}", addr);
+    }
+
+    // Check balance
+    println!("\n1. Current Balances:");
+    let info = sdk.info();
+    let address_str = sdk.address().map(|a| format!("{:?}", a)).unwrap_or_default();
+
+    match info.clearinghouse_state(&address_str, None).await {
+        Ok(state) => {
+            if let Some(margin) = state.get("marginSummary") {
+                let value = margin.get("accountValue").and_then(|v| v.as_str()).unwrap_or("0");
+                let withdrawable = state.get("withdrawable").and_then(|v| v.as_str()).unwrap_or("0");
+                println!("   Account Value: ${}", value);
+                println!("   Withdrawable: ${}", withdrawable);
+            }
+        }
+        Err(e) => println!("   Error: {}", e),
+    }
 
     // Transfer USD to another address
-    // let result = sdk.transfer_usd(
-    //     "0x1234567890123456789012345678901234567890",
-    //     10.0
-    // ).await?;
-    // println!("USD transfer: {:?}", result);
+    println!("\n2. Transfer USD:");
+    println!("   sdk.transfer_usd(destination, amount)");
+    // match sdk.transfer_usd("0xRecipientAddress", 100.0).await {
+    //     Ok(result) => println!("   Result: {:?}", result),
+    //     Err(e) => println!("   Error: {}", e),
+    // }
 
-    // Transfer spot asset to another address
-    // let result = sdk.transfer_spot(
-    //     "PURR",  // or token index
-    //     "0x1234567890123456789012345678901234567890",
-    //     100.0
-    // ).await?;
-    // println!("Spot transfer: {:?}", result);
+    // Spot to Perp transfer
+    println!("\n3. Spot to Perp Transfer:");
+    match sdk.transfer_spot_to_perp(10.0).await {
+        Ok(result) => println!("   Result: {:?}", result),
+        Err(e) => println!("   Error (may need spot balance): {}", e),
+    }
 
-    // Transfer from spot wallet to perp wallet (internal)
-    // let result = sdk.transfer_spot_to_perp(100.0).await?;
-    // println!("Spot to perp: {:?}", result);
+    // Perp to Spot transfer
+    println!("\n4. Perp to Spot Transfer:");
+    match sdk.transfer_perp_to_spot(10.0).await {
+        Ok(result) => println!("   Result: {:?}", result),
+        Err(e) => println!("   Error (may need free margin): {}", e),
+    }
 
-    // Transfer from perp wallet to spot wallet (internal)
-    // let result = sdk.transfer_perp_to_spot(100.0).await?;
-    // println!("Perp to spot: {:?}", result);
+    // Transfer spot tokens
+    println!("\n5. Transfer Spot Tokens:");
+    println!("   sdk.transfer_spot(destination, token, amount, to_perp)");
+    // match sdk.transfer_spot("0xRecipient", "USDC", 100.0, false).await {
+    //     Ok(result) => println!("   Result: {:?}", result),
+    //     Err(e) => println!("   Error: {}", e),
+    // }
 
-    // Send asset (generalized transfer)
-    // let result = sdk.send_asset(
-    //     "USDC",  // or token index
-    //     "100.0",
-    //     "0x1234567890123456789012345678901234567890"
-    // ).await?;
-    // println!("Send asset: {:?}", result);
+    println!("\n{}", "-".repeat(50));
+    println!("Transfer Methods:");
+    println!("  - transfer_usd: Send USDC to another address");
+    println!("  - transfer_spot_to_perp: Move from spot to perp");
+    println!("  - transfer_perp_to_spot: Move from perp to spot");
+    println!("  - transfer_spot: Transfer spot tokens");
 
-    println!("Transfer methods available:");
-    println!("  sdk.transfer_usd(destination, amount)");
-    println!("  sdk.transfer_spot(token, destination, amount)");
-    println!("  sdk.transfer_spot_to_perp(amount)");
-    println!("  sdk.transfer_perp_to_spot(amount)");
-    println!("  sdk.send_asset(token, amount, destination)");
+    println!("\n{}", "=".repeat(50));
+    println!("Done!");
 
     Ok(())
 }

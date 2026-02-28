@@ -1,51 +1,91 @@
-// Open Orders Example
+// Open Orders Example — Retrieve all open orders for an authenticated user.
 //
-// View all open orders with details.
-//
-// Requires: PRIVATE_KEY environment variable
+// This example matches the Python open_orders.py exactly.
 package main
 
 import (
 	"fmt"
-	"log"
 	"os"
+	"strconv"
 
-	"github.com/quiknode-labs/raptor/hyperliquid-sdk/go/hyperliquid"
+	"github.com/quiknode-labs/hyperliquid-sdk/go/hyperliquid"
 )
 
 func main() {
-	// Private key required to query your open orders
 	privateKey := os.Getenv("PRIVATE_KEY")
+	endpoint := os.Getenv("QUICKNODE_ENDPOINT")
+	if endpoint == "" {
+		endpoint = os.Getenv("ENDPOINT")
+	}
+
 	if privateKey == "" {
-		fmt.Println("Set PRIVATE_KEY environment variable")
-		fmt.Println("Example: export PRIVATE_KEY='0x...'")
+		fmt.Println("Open Orders Example")
+		fmt.Println("==================================================")
+		fmt.Println()
+		fmt.Println("Usage:")
+		fmt.Println("  export PRIVATE_KEY='0xYourPrivateKey'")
+		fmt.Println("  export QUICKNODE_ENDPOINT='https://YOUR-ENDPOINT.quiknode.pro/TOKEN'")
+		fmt.Println("  go run main.go")
 		os.Exit(1)
 	}
 
-	sdk, err := hyperliquid.New("", hyperliquid.WithPrivateKey(privateKey))
+	fmt.Println("Open Orders Example")
+	fmt.Println("==================================================")
+
+	sdk, err := hyperliquid.New(endpoint, hyperliquid.WithPrivateKey(privateKey))
 	if err != nil {
-		log.Fatalf("Failed to create SDK: %v", err)
+		fmt.Printf("Failed to create SDK: %v\n", err)
+		os.Exit(1)
 	}
 
-	// Get all open orders (pass empty string to use wallet address)
-	result, err := sdk.OpenOrders("")
-	if err != nil {
-		log.Fatalf("Failed to get open orders: %v", err)
-	}
-	orderList, _ := result["orders"].([]any)
-	fmt.Printf("Open orders: %d\n", len(orderList))
+	fmt.Printf("Address: %s\n", sdk.Address())
+	fmt.Println()
 
-	for _, o := range orderList {
-		order := o.(map[string]any)
-		side := "BUY"
-		if order["side"] == "A" {
-			side = "SELL"
+	// Get all open orders (pass empty string to use SDK's address)
+	fmt.Println("Fetching open orders...")
+	ordersResp, err := sdk.OpenOrders("")
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	orders, _ := ordersResp["orders"].([]any)
+	fmt.Printf("Open orders: %d\n", len(orders))
+	fmt.Println("------------------------------")
+
+	for i, order := range orders {
+		if i >= 10 {
+			fmt.Printf("  ... and %d more\n", len(orders)-10)
+			break
 		}
-		fmt.Printf("  %s %s %s @ %s (OID: %v)\n",
-			order["coin"], side, order["sz"], order["limitPx"], order["oid"])
+		o := order.(map[string]any)
+		oid, _ := o["oid"].(float64)
+		coin, _ := o["coin"].(string)
+		side, _ := o["side"].(string)
+		sz, _ := o["sz"].(string)
+		limitPx, _ := o["limitPx"].(string)
+
+		sideStr := "SELL"
+		if side == "B" {
+			sideStr = "BUY"
+		}
+
+		pxFloat, _ := strconv.ParseFloat(limitPx, 64)
+		fmt.Printf("  OID: %d | %s %s %s @ $%.2f\n", int(oid), coin, sideStr, sz, pxFloat)
 	}
 
-	// Get order status for a specific order
-	// status, _ := sdk.OrderStatus(12345, "")
-	// fmt.Printf("Order status: %v\n", status)
+	// Get specific order status (example)
+	// if len(orders) > 0 {
+	//     oid := int64(orders[0].(map[string]any)["oid"].(float64))
+	//     status, err := sdk.OrderStatus(oid, "")
+	//     if err != nil {
+	//         fmt.Printf("Error: %v\n", err)
+	//     } else {
+	//         fmt.Printf("Order %d status: %v\n", oid, status)
+	//     }
+	// }
+
+	fmt.Println()
+	fmt.Println("==================================================")
+	fmt.Println("Done!")
 }

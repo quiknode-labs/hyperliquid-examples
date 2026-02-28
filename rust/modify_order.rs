@@ -1,51 +1,90 @@
 //! Modify Order Example
 //!
-//! Place a resting order and then modify its price.
+//! Modify an existing order's price or size.
 //!
 //! # Usage
 //! ```bash
-//! export PRIVATE_KEY=0x...
+//! export ENDPOINT="https://your-endpoint.hype-mainnet.quiknode.pro/TOKEN"
+//! export PRIVATE_KEY="0x..."
 //! cargo run --example modify_order
 //! ```
 
-use hyperliquid_sdk::HyperliquidSDK;
+use hyperliquid_sdk::{HyperliquidSDK, Order, TIF};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tracing_subscriber::fmt::init();
-
     let endpoint = std::env::var("ENDPOINT").ok();
+    let private_key = std::env::var("PRIVATE_KEY").ok();
+
+    if endpoint.is_none() || private_key.is_none() {
+        eprintln!("Usage:");
+        eprintln!("  export ENDPOINT='https://your-endpoint.hype-mainnet.quiknode.pro/TOKEN'");
+        eprintln!("  export PRIVATE_KEY='0x...'");
+        eprintln!("  cargo run --example modify_order");
+        std::process::exit(1);
+    }
+
+    println!("Modify Order Example");
+    println!("{}", "=".repeat(50));
 
     let mut builder = HyperliquidSDK::new();
-    if let Some(ep) = endpoint {
+    if let Some(ep) = &endpoint {
         builder = builder.endpoint(ep);
     }
-
+    if let Some(pk) = &private_key {
+        builder = builder.private_key(pk);
+    }
     let sdk = builder.build().await?;
 
-    println!("SDK initialized for address: {:?}", sdk.address());
+    if let Some(addr) = sdk.address() {
+        println!("Address: {}", addr);
+    }
 
-    // Place a resting order
+    // Get current price
     let mid = sdk.get_mid("BTC").await?;
-    let limit_price = (mid * 0.97) as i64;
+    println!("\nBTC mid price: ${:.2}", mid);
 
-    let order = sdk.limit_buy("BTC", limit_price as f64, 0.0001).await?;
-    println!("Placed order at ${}", limit_price);
-    println!("  OID: {:?}", order.oid);
+    // Place an order first
+    println!("\n1. Placing initial order...");
+    let order = Order::buy("BTC")
+        .size(0.001)
+        .price(mid * 0.95)  // 5% below mid
+        .gtc();
 
-    // Modify to a new price (4% below mid)
-    let new_price = (mid * 0.96) as i64;
-    if let Some(oid) = order.oid {
-        let new_order = sdk.modify_order(oid, "BTC", Some(new_price as f64), None).await?;
-        println!("Modified to ${}", new_price);
-        println!("  New OID: {:?}", new_order.oid);
+    let placed = sdk.order(order).await?;
+    println!("   Status: {}", placed.status);
+    println!("   OID: {:?}", placed.oid);
+
+    if let Some(oid) = placed.oid {
+        // Modify the order - improve price
+        println!("\n2. Modifying order (better price)...");
+        match sdk.modify(
+            oid,
+            "BTC",
+            true,           // is_buy
+            0.001,          // size
+            mid * 0.96,     // new price (closer to mid)
+            TIF::Gtc,
+            false,          // reduce_only
+            None,           // cloid
+        ).await {
+            Ok(modified) => {
+                println!("   Status: {}", modified.status);
+                println!("   New OID: {:?}", modified.oid);
+            }
+            Err(e) => println!("   Error: {}", e),
+        }
 
         // Clean up
-        if let Some(new_oid) = new_order.oid {
-            sdk.cancel(new_oid, "BTC").await?;
-            println!("Order cancelled.");
+        println!("\n3. Cancelling order...");
+        match sdk.cancel(oid, "BTC").await {
+            Ok(_) => println!("   Cancelled"),
+            Err(e) => println!("   Error: {}", e),
         }
     }
+
+    println!("\n{}", "=".repeat(50));
+    println!("Done!");
 
     Ok(())
 }

@@ -1,120 +1,130 @@
 // WebSocket Streaming Example — Real-Time HyperCore Data
 //
 // Stream trades, orders, book updates, events, and TWAP via WebSocket.
-// These are the data streams available on QuickNode endpoints.
 //
-// Setup:
-//     go build
+// Available WebSocket streams:
+// - trades: Executed trades with price, size, direction
+// - orders: Order lifecycle events (open, filled, cancelled)
+// - book_updates: Order book changes (incremental deltas)
+// - events: Balance changes, transfers, deposits, withdrawals
+// - twap: TWAP execution data
+// - writer_actions: HyperCore <-> HyperEVM asset transfers
+//
+// Note: L2/L4 order book snapshots are available via gRPC (see stream_orderbook example).
 //
 // Usage:
-//     export ENDPOINT="https://your-endpoint.hype-mainnet.quiknode.pro/YOUR_TOKEN"
-//     ./stream_trades
+//
+//	export ENDPOINT="https://your-endpoint/YOUR_TOKEN"
+//	go run main.go
 package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"time"
 
-	"github.com/quiknode-labs/raptor/hyperliquid-sdk/go/hyperliquid"
+	"github.com/quiknode-labs/hyperliquid-sdk/go/hyperliquid"
 )
 
 func main() {
 	endpoint := os.Getenv("ENDPOINT")
 	if endpoint == "" {
-		endpoint = os.Getenv("QUICKNODE_ENDPOINT")
-	}
-	if endpoint == "" {
 		fmt.Println("WebSocket Streaming Example")
-		fmt.Println("============================================================")
+		fmt.Println(string(repeat('=', 60)))
 		fmt.Println()
 		fmt.Println("Usage:")
-		fmt.Println("  export ENDPOINT='https://YOUR-ENDPOINT.quiknode.pro/TOKEN'")
-		fmt.Println("  go run stream_trades.go")
+		fmt.Println("  export ENDPOINT='https://YOUR-ENDPOINT/TOKEN'")
+		fmt.Println("  go run main.go")
 		os.Exit(1)
 	}
 
-	fmt.Println("============================================================")
-	fmt.Println("WebSocket Streaming Examples (QuickNode)")
-	fmt.Println("============================================================")
-	fmt.Printf("Endpoint: %s...\n", truncate(endpoint, 50))
-	fmt.Println()
-	fmt.Println("This demo shows QuickNode WebSocket streaming capabilities:")
-	fmt.Println("  1. Trades - Real-time executed trades")
-	fmt.Println("  2. Orders - Order lifecycle events")
-	fmt.Println("  3. Book Updates - Incremental order book changes")
-	fmt.Println("  4. Events - Balance changes, transfers, etc.")
-	fmt.Println("  5. Multi-stream - Multiple subscriptions")
-	fmt.Println()
+	fmt.Println(string(repeat('=', 60)))
+	fmt.Println("WebSocket Trade Streaming")
+	fmt.Println(string(repeat('=', 60)))
 
-	// Example 1: Stream Trades
-	fmt.Println()
-	fmt.Println("============================================================")
-	fmt.Println("EXAMPLE 1: Streaming Trades")
-	fmt.Println("============================================================")
-	fmt.Println("Subscribing to BTC and ETH trades...")
-	fmt.Println("------------------------------------------------------------")
+	// Create SDK
+	sdk, err := hyperliquid.New(endpoint)
+	if err != nil {
+		log.Fatalf("Failed to create SDK: %v", err)
+	}
 
-	stream := hyperliquid.NewStream(endpoint, nil)
 	tradeCount := 0
 
+	stream := sdk.NewStream(&hyperliquid.StreamConfig{
+		Reconnect: false,
+		OnOpen: func() {
+			fmt.Println("[CONNECTED]")
+		},
+		OnError: func(err error) {
+			fmt.Printf("[ERROR] %v\n", err)
+		},
+	})
+
 	stream.Trades([]string{"BTC", "ETH"}, func(data map[string]any) {
-		tradeCount++
-		block, _ := data["block"].(map[string]any)
-		events, _ := block["events"].([]any)
+		block, ok := data["block"].(map[string]any)
+		if !ok {
+			return
+		}
+		events, ok := block["events"].([]any)
+		if !ok {
+			return
+		}
+
 		for _, event := range events {
-			if arr, ok := event.([]any); ok && len(arr) >= 2 {
-				trade, _ := arr[1].(map[string]any)
-				side := "BUY "
-				if trade["side"] == "A" {
-					side = "SELL"
-				}
-				fmt.Printf("[%s] %s %s %s @ $%s\n",
-					time.Now().Format("15:04:05.000"),
-					side, trade["sz"], trade["coin"], trade["px"])
+			eventArr, ok := event.([]any)
+			if !ok || len(eventArr) < 2 {
+				continue
+			}
+			t, ok := eventArr[1].(map[string]any)
+			if !ok {
+				continue
+			}
+
+			tradeCount++
+			coin := t["coin"]
+			px := t["px"]
+			sz := t["sz"]
+			side := "BUY "
+			if t["side"] == "A" {
+				side = "SELL"
+			}
+			fmt.Printf("[%s] %s %v %v @ $%v\n", timestamp(), side, sz, coin, px)
+
+			if tradeCount >= 10 {
+				fmt.Printf("\nReceived %d trades.\n", tradeCount)
+				return
 			}
 		}
 	})
 
+	fmt.Println("\nSubscribing to BTC and ETH trades...")
+	fmt.Println(string(repeat('-', 60)))
+
 	if err := stream.Start(); err != nil {
-		fmt.Printf("Failed to start stream: %v\n", err)
+		fmt.Printf("Start error: %v\n", err)
 		return
 	}
 
-	// Run for 10 seconds
-	time.Sleep(10 * time.Second)
+	start := time.Now()
+	for tradeCount < 10 && time.Since(start) < 30*time.Second {
+		time.Sleep(100 * time.Millisecond)
+	}
+
 	stream.Stop()
 
-	fmt.Printf("\nTotal trades received: %d\n", tradeCount)
-
-	// Show available streams
-	fmt.Println()
-	fmt.Println("============================================================")
-	fmt.Println("AVAILABLE QUICKNODE WEBSOCKET STREAMS")
-	fmt.Println("============================================================")
-	fmt.Println()
-	fmt.Println("HyperCore Data Streams:")
-	fmt.Println()
-	fmt.Println("  stream.Trades(coins, callback)")
-	fmt.Println("    - Executed trades with price, size, direction")
-	fmt.Println()
-	fmt.Println("  stream.Orders(coins, callback)")
-	fmt.Println("    - Order lifecycle: open, filled, triggered, canceled")
-	fmt.Println()
-	fmt.Println("  stream.BookUpdates(coins, callback)")
-	fmt.Println("    - Incremental order book changes (deltas)")
-	fmt.Println()
-	fmt.Println("  stream.Events(callback)")
-	fmt.Println("    - Balance changes, transfers, deposits, withdrawals")
-	fmt.Println()
-	fmt.Println("For L2/L4 Order Books:")
-	fmt.Println("  Use gRPC streaming (see stream_grpc.go)")
-	fmt.Println()
+	fmt.Println("\n" + string(repeat('=', 60)))
+	fmt.Println("Done!")
 }
 
-func truncate(s string, n int) string {
-	if len(s) <= n {
-		return s
+func timestamp() string {
+	return time.Now().Format("15:04:05.000")
+}
+
+func repeat(b byte, n int) []byte {
+	result := make([]byte, n)
+	for i := range result {
+		result[i] = b
 	}
-	return s[:n]
+	return result
 }

@@ -1,18 +1,14 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "CommonJS",
-    "moduleResolution": "node",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "esModuleInterop": true,
     "strict": false,
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "declaration": false,
-    "noEmit": true,
-    "baseUrl": ".",
-    "paths": {
-      "hyperliquid-sdk": ["../../hyperliquid-sdk/typescript/dist"]
-    }
+    "noEmit": true
   },
   "include": ["*.ts"],
   "exclude": ["node_modules"]

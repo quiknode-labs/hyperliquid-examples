@@ -6,11 +6,12 @@ Runnable examples using the [Hyperliquid SDK](https://github.com/quiknode-labs/h
 
 ## Available Examples
 
-| Language | Directory | Status |
-|----------|-----------|--------|
-| [Python](./python/) | `cd python && python market_order.py` | Available |
-| [TypeScript](./typescript/) | `cd typescript && npx ts-node market_order.ts` | Coming soon |
-| [Rust](./rust/) | `cd rust && cargo run --example market_order` | Coming soon |
+| Language | Package | Registry |
+|----------|---------|----------|
+| [Python](./python/) | `hyperliquid-sdk` | [PyPI](https://pypi.org/project/hyperliquid-sdk/) |
+| [TypeScript](./typescript/) | `@quicknode/hyperliquid-sdk` | [npm](https://www.npmjs.com/package/@quicknode/hyperliquid-sdk) |
+| [Rust](./rust/) | `quicknode-hyperliquid-sdk` | [crates.io](https://crates.io/crates/quicknode-hyperliquid-sdk) |
+| [Go](./go/) | `github.com/quiknode-labs/hyperliquid-sdk/go` | [GitHub](https://github.com/quiknode-labs/hyperliquid-sdk) |
 
 ## Quick Start
 
@@ -29,19 +30,46 @@ cd python
 python market_order.py
 ```
 
-### TypeScript (Coming Soon)
+### TypeScript
 
 ```bash
-npm install hyperliquid-sdk
 cd typescript
-npx ts-node market_order.ts
+
+# Install dependencies
+npm install
+
+# Set credentials
+export PRIVATE_KEY="0x..."
+export ENDPOINT="https://your-endpoint.hype-mainnet.quiknode.pro/YOUR_TOKEN"
+
+# Run any example
+npx tsx market_order.ts
 ```
 
-### Rust (Coming Soon)
+### Rust
 
 ```bash
 cd rust
-cargo run --example market_order
+
+# Set credentials
+export PRIVATE_KEY="0x..."
+export ENDPOINT="https://your-endpoint.hype-mainnet.quiknode.pro/YOUR_TOKEN"
+
+# Run any example
+cargo run --bin market_order
+```
+
+### Go
+
+```bash
+cd go
+
+# Set credentials
+export PRIVATE_KEY="0x..."
+export ENDPOINT="https://your-endpoint.hype-mainnet.quiknode.pro/YOUR_TOKEN"
+
+# Run any example
+go run ./market_order
 ```
 
 ## Example Categories
@@ -54,12 +82,12 @@ Each language directory contains examples for:
 - **HyperEVM** — Ethereum JSON-RPC calls
 - **Streaming** — WebSocket and gRPC real-time data (L2/L4 order book)
 
-See the README in each language directory for the full list.
-
 ## Links
 
 - **SDK Repository**: https://github.com/quiknode-labs/hyperliquid-sdk
 - **SDK on PyPI**: https://pypi.org/project/hyperliquid-sdk/
+- **SDK on npm**: https://www.npmjs.com/package/@quicknode/hyperliquid-sdk
+- **SDK on crates.io**: https://crates.io/crates/quicknode-hyperliquid-sdk
 - **Documentation**: https://hyperliquidapi.com
 - **QuickNode Docs**: https://www.quicknode.com/docs/hyperliquid
 

@@ -1,14 +1,22 @@
 #!/usr/bin/env npx ts-node
+// @ts-nocheck
 /**
  * Limit Order Example
  *
  * Place a limit order that rests on the book until filled or cancelled.
  */
 
-import { HyperliquidSDK } from 'hyperliquid-sdk';
+import { HyperliquidSDK } from '@quicknode/hyperliquid-sdk';
+
+const PRIVATE_KEY = process.env.PRIVATE_KEY;
+
+if (!PRIVATE_KEY) {
+  console.error("Set PRIVATE_KEY environment variable");
+  process.exit(1);
+}
 
 async function main() {
-  const sdk = new HyperliquidSDK();
+  const sdk = new HyperliquidSDK(undefined, { privateKey: PRIVATE_KEY });
 
   // Get current price
   const mid = await sdk.getMid("BTC");

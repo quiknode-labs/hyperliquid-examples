@@ -1,35 +1,65 @@
-// Close Position Example
+// Close Position Example — Close an open position completely.
 //
-// Close an open position completely. The SDK figures out the size and direction.
+// This example matches the Python close_position.py exactly.
 package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 
-	"github.com/quiknode-labs/raptor/hyperliquid-sdk/go/hyperliquid"
+	"github.com/quiknode-labs/hyperliquid-sdk/go/hyperliquid"
 )
 
 func main() {
 	privateKey := os.Getenv("PRIVATE_KEY")
+	endpoint := os.Getenv("QUICKNODE_ENDPOINT")
+	if endpoint == "" {
+		endpoint = os.Getenv("ENDPOINT")
+	}
+
 	if privateKey == "" {
-		fmt.Println("Set PRIVATE_KEY environment variable")
-		fmt.Println("Example: export PRIVATE_KEY='0x...'")
+		fmt.Println("Close Position Example")
+		fmt.Println("==================================================")
+		fmt.Println()
+		fmt.Println("Usage:")
+		fmt.Println("  export PRIVATE_KEY='0xYourPrivateKey'")
+		fmt.Println("  export QUICKNODE_ENDPOINT='https://YOUR-ENDPOINT.quiknode.pro/TOKEN'")
+		fmt.Println("  go run main.go")
 		os.Exit(1)
 	}
 
-	sdk, err := hyperliquid.New("", hyperliquid.WithPrivateKey(privateKey))
+	fmt.Println("Close Position Example")
+	fmt.Println("==================================================")
+
+	sdk, err := hyperliquid.New(endpoint, hyperliquid.WithPrivateKey(privateKey))
 	if err != nil {
-		log.Fatalf("Failed to create SDK: %v", err)
+		fmt.Printf("Failed to create SDK: %v\n", err)
+		os.Exit(1)
 	}
 
-	// Close BTC position (if any)
-	// The SDK queries your position and builds the counter-order automatically
+	fmt.Printf("Address: %s\n", sdk.Address())
+	fmt.Println()
+
+	// Close BTC position
+	// The SDK automatically:
+	// 1. Queries your current BTC position
+	// 2. Determines size and direction
+	// 3. Places a counter-order to close
+	fmt.Println("Closing BTC position...")
 	result, err := sdk.ClosePosition("BTC")
 	if err != nil {
-		fmt.Printf("No position to close or error: %v\n", err)
+		// Common error: no position exists
+		fmt.Printf("Error: %v\n", err)
+		fmt.Println()
+		fmt.Println("Note: This error is expected if you have no BTC position.")
 	} else {
-		fmt.Printf("Closed position: %v\n", result)
+		fmt.Printf("Position closed: %v\n", result)
+		fmt.Printf("  OID: %d\n", result.OID)
+		fmt.Printf("  Status: %s\n", result.Status)
+		fmt.Printf("  Filled Size: %s\n", result.FilledSize)
 	}
+
+	fmt.Println()
+	fmt.Println("==================================================")
+	fmt.Println("Done!")
 }

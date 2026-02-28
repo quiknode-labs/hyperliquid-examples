@@ -1,53 +1,137 @@
-// TWAP Orders Example
+// TWAP Example — Time-Weighted Average Price order execution.
 //
-// Time-Weighted Average Price orders for large trades.
+// This example demonstrates:
+// - Placing TWAP orders for gradual execution
+// - Configuring TWAP parameters (duration, slices)
+// - Monitoring TWAP progress
+// - Cancelling active TWAP orders
 //
-// Requires: PRIVATE_KEY environment variable
+// This example matches the Python SDK patterns exactly.
 package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 
-	"github.com/quiknode-labs/raptor/hyperliquid-sdk/go/hyperliquid"
+	"github.com/quiknode-labs/hyperliquid-sdk/go/hyperliquid"
 )
 
 func main() {
 	privateKey := os.Getenv("PRIVATE_KEY")
+	endpoint := os.Getenv("QUICKNODE_ENDPOINT")
+	if endpoint == "" {
+		endpoint = os.Getenv("ENDPOINT")
+	}
+
 	if privateKey == "" {
-		fmt.Println("Set PRIVATE_KEY environment variable")
-		fmt.Println("Example: export PRIVATE_KEY='0x...'")
+		fmt.Println("TWAP Example")
+		fmt.Println("==================================================")
+		fmt.Println()
+		fmt.Println("Usage:")
+		fmt.Println("  export PRIVATE_KEY='0xYourPrivateKey'")
+		fmt.Println("  export QUICKNODE_ENDPOINT='https://YOUR-ENDPOINT.quiknode.pro/TOKEN'")
+		fmt.Println("  go run main.go")
 		os.Exit(1)
 	}
 
-	sdk, err := hyperliquid.New("", hyperliquid.WithPrivateKey(privateKey))
+	fmt.Println("TWAP Example")
+	fmt.Println("==================================================")
+
+	sdk, err := hyperliquid.New(endpoint, hyperliquid.WithPrivateKey(privateKey))
 	if err != nil {
-		log.Fatalf("Failed to create SDK: %v", err)
+		fmt.Printf("Failed to create SDK: %v\n", err)
+		os.Exit(1)
 	}
 
-	mid, err := sdk.GetMid("BTC")
-	if err != nil {
-		log.Fatalf("Failed to get mid: %v", err)
-	}
-	fmt.Printf("BTC mid: $%.2f\n", mid)
+	fmt.Printf("Address: %s\n", sdk.Address())
+	fmt.Println()
 
-	// TWAP order - executes over time to minimize market impact
-	// result, _ := sdk.TwapOrder("BTC", 0.01, true, 60, true, false)
-	//   - asset: "BTC"
-	//   - size: 0.01 (total size to execute)
-	//   - isBuy: true
-	//   - durationMinutes: 60 (execute over 60 minutes)
-	//   - randomize: true (randomize execution times)
-	//   - reduceOnly: false
-	// fmt.Printf("TWAP order: %v\n", result)
-	// twapId := result["response"].(map[string]any)["data"].(map[string]any)["running"].(map[string]any)["id"]
+	// Basic TWAP Order
+	fmt.Println("1. Basic TWAP Order:")
+	fmt.Println("------------------------------")
+	fmt.Println("  Execute $10,000 BTC buy over 1 hour")
+	fmt.Println()
+	fmt.Println("  order := hyperliquid.TWAPOrder().")
+	fmt.Println("      Buy(\"BTC\").")
+	fmt.Println("      Notional(10000).")
+	fmt.Println("      Duration(60)  // 60 minutes")
+	fmt.Println()
+	fmt.Println("  result, err := sdk.PlaceTWAP(order)")
+	fmt.Println()
 
-	// Cancel TWAP order
-	// result, _ := sdk.TwapCancel("BTC", twapId)
-	// fmt.Printf("TWAP cancel: %v\n", result)
+	// Uncomment to place TWAP:
+	// order := hyperliquid.TWAPOrder().Buy("BTC").Notional(10000).Duration(60)
+	// result, err := sdk.PlaceTWAP(order)
+	// if err != nil {
+	//     fmt.Printf("Error: %v\n", err)
+	// } else {
+	//     fmt.Printf("TWAP placed: %v\n", result)
+	// }
 
-	fmt.Println("\nTWAP methods available:")
-	fmt.Println("  sdk.TwapOrder(asset, size, isBuy, durationMinutes, randomize, reduceOnly)")
-	fmt.Println("  sdk.TwapCancel(asset, twapId)")
+	// TWAP with size instead of notional
+	fmt.Println("2. TWAP with Size:")
+	fmt.Println("------------------------------")
+	fmt.Println("  Buy 1 BTC over 2 hours")
+	fmt.Println()
+	fmt.Println("  order := hyperliquid.TWAPOrder().")
+	fmt.Println("      Buy(\"BTC\").")
+	fmt.Println("      Size(1.0).")
+	fmt.Println("      Duration(120)")
+	fmt.Println()
+
+	// TWAP Sell Order
+	fmt.Println("3. TWAP Sell Order:")
+	fmt.Println("------------------------------")
+	fmt.Println("  Sell 0.5 ETH over 30 minutes")
+	fmt.Println()
+	fmt.Println("  order := hyperliquid.TWAPOrder().")
+	fmt.Println("      Sell(\"ETH\").")
+	fmt.Println("      Size(0.5).")
+	fmt.Println("      Duration(30)")
+	fmt.Println()
+
+	// TWAP with randomization
+	fmt.Println("4. TWAP with Randomization:")
+	fmt.Println("------------------------------")
+	fmt.Println("  Add randomization to slice timing")
+	fmt.Println()
+	fmt.Println("  order := hyperliquid.TWAPOrder().")
+	fmt.Println("      Buy(\"BTC\").")
+	fmt.Println("      Notional(5000).")
+	fmt.Println("      Duration(60).")
+	fmt.Println("      Randomize(true)")
+	fmt.Println()
+
+	// Check active TWAP orders - would use WebSocket streaming
+	fmt.Println("Checking Active TWAP Orders:")
+	fmt.Println("------------------------------")
+	fmt.Println("  Use WebSocket stream.TWAPStates(user) to monitor active TWAPs")
+	fmt.Println("  TWAP progress is reported in real-time via the stream")
+	fmt.Println()
+
+	// Cancel TWAP
+	fmt.Println("5. Cancel TWAP:")
+	fmt.Println("------------------------------")
+	fmt.Println("  sdk.CancelTWAP(twapId)")
+	fmt.Println()
+
+	// Uncomment to cancel:
+	// twapId := 12345
+	// result, err := sdk.CancelTWAP(twapId)
+	// if err != nil {
+	//     fmt.Printf("Error: %v\n", err)
+	// } else {
+	//     fmt.Printf("TWAP cancelled: %v\n", result)
+	// }
+
+	fmt.Println("Notes:")
+	fmt.Println("  - TWAP splits orders into slices over the duration")
+	fmt.Println("  - Each slice executes as a market order")
+	fmt.Println("  - Slippage protection is built-in")
+	fmt.Println("  - Can be cancelled at any time (unfilled portion)")
+	fmt.Println("  - Progress can be monitored via ActiveTWAPs()")
+
+	fmt.Println()
+	fmt.Println("==================================================")
+	fmt.Println("Done!")
 }

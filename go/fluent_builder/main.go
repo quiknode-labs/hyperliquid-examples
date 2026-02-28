@@ -1,85 +1,116 @@
-// Fluent Order Builder Example
+// Fluent Builder Example — Create orders using the fluent builder API.
 //
-// For power users who want maximum control with IDE autocomplete.
+// This example matches the Python fluent_builder.py exactly.
 package main
 
 import (
 	"fmt"
-	"log"
-	"math"
 	"os"
 
-	"github.com/quiknode-labs/raptor/hyperliquid-sdk/go/hyperliquid"
+	"github.com/quiknode-labs/hyperliquid-sdk/go/hyperliquid"
 )
 
 func main() {
 	privateKey := os.Getenv("PRIVATE_KEY")
+	endpoint := os.Getenv("QUICKNODE_ENDPOINT")
+	if endpoint == "" {
+		endpoint = os.Getenv("ENDPOINT")
+	}
+
 	if privateKey == "" {
-		fmt.Println("Set PRIVATE_KEY environment variable")
-		fmt.Println("Example: export PRIVATE_KEY='0x...'")
+		fmt.Println("Fluent Builder Example")
+		fmt.Println("==================================================")
+		fmt.Println()
+		fmt.Println("Usage:")
+		fmt.Println("  export PRIVATE_KEY='0xYourPrivateKey'")
+		fmt.Println("  export QUICKNODE_ENDPOINT='https://YOUR-ENDPOINT.quiknode.pro/TOKEN'")
+		fmt.Println("  go run main.go")
 		os.Exit(1)
 	}
 
-	sdk, err := hyperliquid.New("", hyperliquid.WithPrivateKey(privateKey))
+	fmt.Println("Fluent Builder Example")
+	fmt.Println("==================================================")
+
+	sdk, err := hyperliquid.New(endpoint, hyperliquid.WithPrivateKey(privateKey))
 	if err != nil {
-		log.Fatalf("Failed to create SDK: %v", err)
+		fmt.Printf("Failed to create SDK: %v\n", err)
+		os.Exit(1)
 	}
 
-	mid, err := sdk.GetMid("BTC")
-	if err != nil {
-		log.Fatalf("Failed to get mid: %v", err)
-	}
+	fmt.Printf("Address: %s\n", sdk.Address())
+	fmt.Println()
 
-	// Simple limit order with GTC (Good Till Cancelled) - minimum $10 value
-	// Use size directly to ensure proper decimal precision (BTC allows 5 decimals)
-	orderSpec := hyperliquid.Order().
+	// Example 1: Limit buy with size
+	fmt.Println("Example 1: Limit Buy with Size")
+	fmt.Println("------------------------------")
+	order1 := hyperliquid.Order().
 		Buy("BTC").
-		Size(0.00017). // ~$11 worth at ~$65k (minimum is $10)
-		Price(math.Floor(mid * 0.97)).
-		GTC()
+		Size(0.001).  // 0.001 BTC (5 decimal precision)
+		Price(60000). // Limit price
+		GTC()         // Good Till Cancelled
 
-	order, err := sdk.PlaceOrder(orderSpec)
-	if err != nil {
-		log.Fatalf("Failed to place order: %v", err)
-	}
-	fmt.Printf("Limit GTC: %v\n", order)
+	fmt.Printf("Order: %+v\n", order1)
+	fmt.Println()
 
-	order.Cancel()
+	// Example 2: Limit sell with notional
+	fmt.Println("Example 2: Limit Sell with Notional")
+	fmt.Println("------------------------------")
+	order2 := hyperliquid.Order().
+		Sell("ETH").
+		Notional(100). // $100 worth
+		Price(4000).   // Limit price
+		IOC()          // Immediate or Cancel
 
-	// Market order by notional value
-	// orderSpec := hyperliquid.Order().
-	//     Sell("ETH").
-	//     Notional(10).
-	//     Market()
-	// order, _ := sdk.PlaceOrder(orderSpec)
-	// fmt.Printf("Market: %v\n", order)
+	fmt.Printf("Order: %+v\n", order2)
+	fmt.Println()
 
-	// Reduce-only order (only closes existing position)
-	// orderSpec := hyperliquid.Order().
-	//     Sell("BTC").
-	//     Size(0.001).
-	//     Price(mid * 1.03).
-	//     GTC().
-	//     ReduceOnly()
-	// order, _ := sdk.PlaceOrder(orderSpec)
-	// fmt.Printf("Reduce-only: %v\n", order)
+	// Example 3: Market buy
+	fmt.Println("Example 3: Market Buy")
+	fmt.Println("------------------------------")
+	order3 := hyperliquid.Order().
+		Buy("SOL").
+		Notional(50). // $50 worth
+		Market()      // Market order
 
-	// ALO order (Add Liquidity Only / Post-Only)
-	// orderSpec := hyperliquid.Order().
-	//     Buy("BTC").
-	//     Size(0.001).
-	//     Price(mid * 0.95).
-	//     ALO()
-	// order, _ := sdk.PlaceOrder(orderSpec)
-	// fmt.Printf("Post-only: %v\n", order)
+	fmt.Printf("Order: %+v\n", order3)
+	fmt.Println()
 
-	fmt.Println("\nFluent builder methods:")
-	fmt.Println("  .Size(0.001)       - Set size in asset units")
-	fmt.Println("  .Notional(100)     - Set size in USD")
-	fmt.Println("  .Price(65000)      - Set limit price")
-	fmt.Println("  .GTC()             - Good Till Cancelled")
-	fmt.Println("  .IOC()             - Immediate Or Cancel")
-	fmt.Println("  .ALO()             - Add Liquidity Only (post-only)")
-	fmt.Println("  .Market()          - Market order")
-	fmt.Println("  .ReduceOnly()      - Only close position")
+	// Example 4: Post-only order (ALO)
+	fmt.Println("Example 4: Post-Only Order (ALO)")
+	fmt.Println("------------------------------")
+	order4 := hyperliquid.Order().
+		Buy("BTC").
+		Size(0.001).
+		Price(60000).
+		ALO() // Add Liquidity Only
+
+	fmt.Printf("Order: %+v\n", order4)
+	fmt.Println()
+
+	// Example 5: Reduce-only order
+	fmt.Println("Example 5: Reduce-Only Order")
+	fmt.Println("------------------------------")
+	order5 := hyperliquid.Order().
+		Sell("BTC").
+		Size(0.001).
+		Price(70000).
+		GTC().
+		ReduceOnly() // Only closes existing position
+
+	fmt.Printf("Order: %+v\n", order5)
+	fmt.Println()
+
+	// Place an order (uncomment to execute)
+	// result, err := sdk.PlaceOrder(order1)
+	// if err != nil {
+	//     fmt.Printf("Error: %v\n", err)
+	// } else {
+	//     fmt.Printf("Order placed: OID=%d, Status=%s\n", result.OID, result.Status)
+	// }
+
+	fmt.Println("Note: Minimum order size is $10")
+	fmt.Println("      BTC allows 5 decimal precision for size")
+	fmt.Println()
+	fmt.Println("==================================================")
+	fmt.Println("Done!")
 }

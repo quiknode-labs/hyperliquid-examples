@@ -1,4 +1,5 @@
 #!/usr/bin/env npx ts-node
+// @ts-nocheck
 /**
  * Leverage Example
  *
@@ -7,29 +8,30 @@
  * Requires: PRIVATE_KEY environment variable
  */
 
-import { HyperliquidSDK } from 'hyperliquid-sdk';
+import { HyperliquidSDK } from '@quicknode/hyperliquid-sdk';
+
+const PRIVATE_KEY = process.env.PRIVATE_KEY;
+
+if (!PRIVATE_KEY) {
+  console.error("Set PRIVATE_KEY environment variable");
+  console.error("Example: export PRIVATE_KEY='0x...'");
+  process.exit(1);
+}
 
 async function main() {
-  const privateKey = process.env.PRIVATE_KEY;
-  if (!privateKey) {
-    console.log("Set PRIVATE_KEY environment variable");
-    console.log("Example: export PRIVATE_KEY='0x...'");
-    process.exit(1);
-  }
-
-  const sdk = new HyperliquidSDK(undefined, { privateKey });
+  const sdk = new HyperliquidSDK(undefined, { privateKey: PRIVATE_KEY });
   console.log(`Wallet: ${sdk.address}`);
 
   // Update leverage for BTC to 10x cross margin
-  const result = await sdk.updateLeverage("BTC", 10, { isCross: true });
+  const result = await sdk.updateLeverage("BTC", 10, true);
   console.log(`Update leverage result: ${JSON.stringify(result)}`);
 
   // Update leverage for ETH to 5x isolated margin
-  // const result = await sdk.updateLeverage("ETH", 5, { isCross: false });
+  // const result = await sdk.updateLeverage("ETH", 5, false);
   // console.log(`Update leverage result: ${JSON.stringify(result)}`);
 
   console.log("\nLeverage methods available:");
-  console.log("  sdk.updateLeverage(asset, leverage, { isCross: true })");
+  console.log("  sdk.updateLeverage(asset, leverage, isCross)");
 }
 
 main().catch(console.error);

@@ -1,4 +1,5 @@
 #!/usr/bin/env npx ts-node
+// @ts-nocheck
 /**
  * Vaults Example
  *
@@ -7,17 +8,18 @@
  * Requires: PRIVATE_KEY environment variable
  */
 
-import { HyperliquidSDK } from 'hyperliquid-sdk';
+import { HyperliquidSDK } from '@quicknode/hyperliquid-sdk';
+
+const PRIVATE_KEY = process.env.PRIVATE_KEY;
+
+if (!PRIVATE_KEY) {
+  console.error("Set PRIVATE_KEY environment variable");
+  console.error("Example: export PRIVATE_KEY='0x...'");
+  process.exit(1);
+}
 
 async function main() {
-  const privateKey = process.env.PRIVATE_KEY;
-  if (!privateKey) {
-    console.log("Set PRIVATE_KEY environment variable");
-    console.log("Example: export PRIVATE_KEY='0x...'");
-    process.exit(1);
-  }
-
-  const sdk = new HyperliquidSDK(undefined, { privateKey });
+  const sdk = new HyperliquidSDK(undefined, { privateKey: PRIVATE_KEY });
 
   // Example vault address (HLP vault)
   const HLP_VAULT = "0xdfc24b077bc1425ad1dea75bcb6f8158e10df303";

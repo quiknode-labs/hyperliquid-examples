@@ -1,119 +1,118 @@
-// Historical Candles Example
+// Info Candles Example — Fetch historical candlestick data and funding rates.
 //
-// Shows how to fetch historical candlestick (OHLCV) data.
-//
-// Note: candleSnapshot may not be available on all QuickNode endpoints.
-// Check the QuickNode docs for method availability.
-//
-// Setup:
-//     go build
-//
-// Usage:
-//     export ENDPOINT="https://your-endpoint.hype-mainnet.quiknode.pro/YOUR_TOKEN"
-//     ./info_candles
+// This example matches the Python info_candles.py exactly.
 package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"time"
 
-	"github.com/quiknode-labs/raptor/hyperliquid-sdk/go/hyperliquid"
+	"github.com/quiknode-labs/hyperliquid-sdk/go/hyperliquid"
 )
 
 func main() {
-	endpoint := os.Getenv("ENDPOINT")
+	endpoint := os.Getenv("QUICKNODE_ENDPOINT")
 	if endpoint == "" {
-		endpoint = os.Getenv("QUICKNODE_ENDPOINT")
+		endpoint = os.Getenv("ENDPOINT")
 	}
+
 	if endpoint == "" {
-		fmt.Println("Set ENDPOINT environment variable")
+		fmt.Println("Info Candles Example")
+		fmt.Println("==================================================")
+		fmt.Println()
+		fmt.Println("Usage:")
+		fmt.Println("  export QUICKNODE_ENDPOINT='https://YOUR-ENDPOINT.quiknode.pro/TOKEN'")
+		fmt.Println("  go run main.go")
 		os.Exit(1)
 	}
 
+	fmt.Println("Info Candles Example")
+	fmt.Println("==================================================")
+
 	sdk, err := hyperliquid.New(endpoint)
 	if err != nil {
-		log.Fatalf("Failed to create SDK: %v", err)
+		fmt.Printf("Failed to create SDK: %v\n", err)
+		os.Exit(1)
 	}
 	info := sdk.Info()
 
-	fmt.Println("==================================================")
-	fmt.Println("Historical Candles")
-	fmt.Println("==================================================")
-
-	// Last 24 hours
+	// Get candles for the last 24 hours
 	now := time.Now().UnixMilli()
-	dayAgo := now - (24 * 60 * 60 * 1000)
+	oneDayAgo := now - (24 * 60 * 60 * 1000)
 
-	// Fetch BTC 1-hour candles
-	fmt.Println("\n1. BTC 1-Hour Candles (last 24h):")
-	candles, err := info.Candles("BTC", "1h", dayAgo, now)
+	fmt.Println()
+	fmt.Println("BTC 1-Hour Candles (Last 24h)")
+	fmt.Println("------------------------------")
+	candles, err := info.Candles("BTC", "1h", oneDayAgo, now)
 	if err != nil {
-		fmt.Printf("   Error: %v\n", err)
-		fmt.Println("   Note: candleSnapshot may not be available on this endpoint")
+		fmt.Printf("Error: %v\n", err)
+		fmt.Println("Note: candleSnapshot may not be available on all QuickNode endpoints")
 	} else {
-		fmt.Printf("   Retrieved %d candles\n", len(candles))
-		start := len(candles) - 3
-		if start < 0 {
-			start = 0
-		}
-		for _, c := range candles[start:] {
-			candle := c.(map[string]any)
-			fmt.Printf("   O:%s H:%s L:%s C:%s\n", candle["o"], candle["h"], candle["l"], candle["c"])
+		fmt.Printf("Received %d candles\n", len(candles))
+		for i, candle := range candles {
+			if i >= 3 {
+				fmt.Printf("  ... and %d more\n", len(candles)-3)
+				break
+			}
+			c := candle.(map[string]any)
+			open, _ := c["o"].(string)
+			high, _ := c["h"].(string)
+			low, _ := c["l"].(string)
+			close, _ := c["c"].(string)
+			openF, _ := strconv.ParseFloat(open, 64)
+			highF, _ := strconv.ParseFloat(high, 64)
+			lowF, _ := strconv.ParseFloat(low, 64)
+			closeF, _ := strconv.ParseFloat(close, 64)
+			fmt.Printf("  O: $%.2f H: $%.2f L: $%.2f C: $%.2f\n", openF, highF, lowF, closeF)
 		}
 	}
 
-	// Predicted funding rates (supported on QuickNode)
-	fmt.Println("\n2. Predicted Funding Rates:")
+	// Get predicted funding rates
+	fmt.Println()
+	fmt.Println("Predicted Funding Rates")
+	fmt.Println("------------------------------")
 	fundings, err := info.PredictedFundings()
 	if err != nil {
-		fmt.Printf("   Error: %v\n", err)
+		fmt.Printf("Error: %v\n", err)
 	} else {
-		fmt.Printf("   %d assets with funding rates:\n", len(fundings))
+		fmt.Printf("Total assets: %d\n", len(fundings))
 		count := 0
-		for _, item := range fundings {
+		for _, f := range fundings {
 			if count >= 5 {
+				fmt.Printf("  ... and %d more\n", len(fundings)-5)
 				break
 			}
-			arr, ok := item.([]any)
+			// Format: [[coin, [[source, {fundingRate, ...}], ...]], ...]
+			arr, ok := f.([]any)
 			if !ok || len(arr) < 2 {
 				continue
 			}
 			coin, _ := arr[0].(string)
-			sources, _ := arr[1].([]any)
-			if len(sources) == 0 {
+			venues, _ := arr[1].([]any)
+			if len(venues) == 0 {
 				continue
 			}
-			for _, src := range sources {
-				srcArr, ok := src.([]any)
-				if !ok || len(srcArr) < 2 {
+			for _, v := range venues {
+				venueArr, ok := v.([]any)
+				if !ok || len(venueArr) < 2 {
 					continue
 				}
-				if srcArr[0] == "HlPerp" {
-					rateInfo, _ := srcArr[1].(map[string]any)
-					rate := parseFloat(rateInfo["fundingRate"]) * 100
-					fmt.Printf("   %s: %.4f%%\n", coin, rate)
-					count++
-					break
+				fundingInfo, ok := venueArr[1].(map[string]any)
+				if !ok {
+					continue
 				}
+				rateStr, _ := fundingInfo["fundingRate"].(string)
+				rate, _ := strconv.ParseFloat(rateStr, 64)
+				fmt.Printf("  %s: %.4f%% (8h)\n", coin, rate*100)
+				count++
+				break
 			}
 		}
 	}
 
-	fmt.Println("\n==================================================")
+	fmt.Println()
+	fmt.Println("==================================================")
 	fmt.Println("Done!")
-}
-
-func parseFloat(v any) float64 {
-	switch val := v.(type) {
-	case string:
-		f, _ := strconv.ParseFloat(val, 64)
-		return f
-	case float64:
-		return val
-	default:
-		return 0
-	}
 }

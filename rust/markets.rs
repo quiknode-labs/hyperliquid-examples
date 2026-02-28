@@ -1,11 +1,10 @@
 //! Markets Example
 //!
-//! List all available markets and HIP-3 DEXes.
-//!
-//! No endpoint or private key needed — uses public API.
+//! List all available markets and their metadata.
 //!
 //! # Usage
 //! ```bash
+//! export ENDPOINT="https://your-endpoint.hype-mainnet.quiknode.pro/TOKEN"
 //! cargo run --example markets
 //! ```
 
@@ -13,39 +12,78 @@ use hyperliquid_sdk::HyperliquidSDK;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tracing_subscriber::fmt::init();
+    let endpoint = std::env::var("ENDPOINT").ok();
 
-    // No endpoint or private key needed for read-only public queries
-    let sdk = HyperliquidSDK::new().build().await?;
+    if endpoint.is_none() {
+        eprintln!("Usage:");
+        eprintln!("  export ENDPOINT='https://your-endpoint.hype-mainnet.quiknode.pro/TOKEN'");
+        eprintln!("  cargo run --example markets");
+        std::process::exit(1);
+    }
+
+    println!("Markets Example");
+    println!("{}", "=".repeat(50));
+
+    let mut builder = HyperliquidSDK::new();
+    if let Some(ep) = &endpoint {
+        builder = builder.endpoint(ep);
+    }
+    let sdk = builder.build().await?;
 
     // Get all markets
-    let markets = sdk.markets().await?;
-
-    if let Some(perps) = markets.get("perps").and_then(|v| v.as_array()) {
-        println!("Perp markets: {}", perps.len());
-
-        // Show first 5 perp markets
-        println!("\nFirst 5 perp markets:");
-        for m in perps.iter().take(5) {
-            let name = m.get("name").and_then(|v| v.as_str()).unwrap_or("?");
-            let sz_decimals = m.get("szDecimals").and_then(|v| v.as_u64()).unwrap_or(0);
-            println!("  {}: szDecimals={}", name, sz_decimals);
+    println!("\n1. Perpetual Markets:");
+    let info = sdk.info();
+    match info.meta().await {
+        Ok(meta) => {
+            if let Some(universe) = meta.get("universe").and_then(|v| v.as_array()) {
+                println!("   Total: {} markets", universe.len());
+                for (i, asset) in universe.iter().take(10).enumerate() {
+                    let name = asset.get("name").and_then(|v| v.as_str()).unwrap_or("?");
+                    let sz_decimals = asset.get("szDecimals").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let max_leverage = asset.get("maxLeverage").and_then(|v| v.as_u64()).unwrap_or(0);
+                    println!("   [{}] {}: sz_decimals={}, max_leverage={}x",
+                        i + 1, name, sz_decimals, max_leverage);
+                }
+                if universe.len() > 10 {
+                    println!("   ... and {} more", universe.len() - 10);
+                }
+            }
         }
+        Err(e) => println!("   Error: {}", e),
     }
 
-    if let Some(spot) = markets.get("spot").and_then(|v| v.as_array()) {
-        println!("\nSpot markets: {}", spot.len());
-    }
-
-    // Get HIP-3 DEXes
-    let dexes = sdk.dexes().await?;
-    if let Some(arr) = dexes.as_array() {
-        println!("\nHIP-3 DEXes: {}", arr.len());
-        for dex in arr.iter().take(5) {
-            let name = dex.get("name").and_then(|v| v.as_str()).unwrap_or("N/A");
-            println!("  {}", name);
+    // Get spot markets
+    println!("\n2. Spot Markets:");
+    match info.spot_meta().await {
+        Ok(spot) => {
+            if let Some(universe) = spot.get("universe").and_then(|v| v.as_array()) {
+                println!("   Total: {} markets", universe.len());
+                for (i, market) in universe.iter().take(5).enumerate() {
+                    let name = market.get("name").and_then(|v| v.as_str()).unwrap_or("?");
+                    println!("   [{}] {}", i + 1, name);
+                }
+            }
         }
+        Err(e) => println!("   Error: {}", e),
     }
+
+    // Get DEXes (HIP-3)
+    println!("\n3. HIP-3 DEXes:");
+    match sdk.dexes().await {
+        Ok(dexes) => {
+            if let Some(arr) = dexes.get("perpDexs").and_then(|v| v.as_array()) {
+                println!("   Total: {} DEXes", arr.len());
+                for (i, dex) in arr.iter().take(5).enumerate() {
+                    let name = dex.get("name").and_then(|v| v.as_str()).unwrap_or("?");
+                    println!("   [{}] {}", i + 1, name);
+                }
+            }
+        }
+        Err(e) => println!("   Error: {}", e),
+    }
+
+    println!("\n{}", "=".repeat(50));
+    println!("Done!");
 
     Ok(())
 }

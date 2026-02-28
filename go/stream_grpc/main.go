@@ -3,146 +3,174 @@
 // Stream trades, orders, L2 book, L4 book, and blocks via gRPC.
 // gRPC provides lower latency than WebSocket for high-frequency trading.
 //
-// gRPC is included with all QuickNode Hyperliquid endpoints — no add-on needed.
-//
-// Setup:
-//     go build
-//
 // Usage:
-//     export ENDPOINT="https://your-endpoint.hype-mainnet.quiknode.pro/YOUR_TOKEN"
-//     ./stream_grpc
+//
+//	export ENDPOINT="https://your-endpoint/YOUR_TOKEN"
+//	go run main.go
+//
+// The SDK:
+// - Connects to port 10000 automatically
+// - Passes token via x-token header
+// - Handles reconnection with exponential backoff
+// - Manages keepalive pings
 package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"time"
 
-	"github.com/quiknode-labs/raptor/hyperliquid-sdk/go/hyperliquid"
+	"github.com/quiknode-labs/hyperliquid-sdk/go/hyperliquid"
 )
 
 func main() {
 	endpoint := os.Getenv("ENDPOINT")
 	if endpoint == "" {
-		endpoint = os.Getenv("QUICKNODE_ENDPOINT")
-	}
-	if endpoint == "" {
 		fmt.Println("gRPC Streaming Example")
-		fmt.Println("============================================================")
+		fmt.Println(string(repeat('=', 60)))
 		fmt.Println()
 		fmt.Println("Usage:")
-		fmt.Println("  export ENDPOINT='https://YOUR-ENDPOINT.quiknode.pro/TOKEN'")
-		fmt.Println("  go run stream_grpc.go")
-		fmt.Println()
-		fmt.Println("gRPC is included with all QuickNode Hyperliquid endpoints.")
+		fmt.Println("  export ENDPOINT='https://YOUR-ENDPOINT/TOKEN'")
+		fmt.Println("  go run main.go")
 		os.Exit(1)
 	}
 
-	fmt.Println("============================================================")
+	fmt.Println(string(repeat('=', 60)))
 	fmt.Println("gRPC Streaming Examples")
-	fmt.Println("============================================================")
-	fmt.Printf("Endpoint: %s...\n", truncate(endpoint, 50))
-	fmt.Println()
-	fmt.Println("This demo shows all gRPC streaming capabilities:")
-	fmt.Println("  1. Trades — Real-time executed trades")
-	fmt.Println("  2. L2 Book — Aggregated order book by price level")
-	fmt.Println("  3. L4 Book — Individual orders (CRITICAL for trading)")
-	fmt.Println("  4. Orders — Order lifecycle events")
-	fmt.Println("  5. Blocks — Block data")
-	fmt.Println()
+	fmt.Println(string(repeat('=', 60)))
+
+	// Create SDK
+	sdk, err := hyperliquid.New(endpoint)
+	if err != nil {
+		log.Fatalf("Failed to create SDK: %v", err)
+	}
 
 	// Example 1: Stream Trades
-	streamTradesExample(endpoint)
+	fmt.Println("\nExample 1: Streaming Trades")
+	fmt.Println(string(repeat('-', 60)))
 
-	// Example 2: Stream L2 Book
-	streamL2BookExample(endpoint)
-
-	fmt.Println()
-	fmt.Println("============================================================")
-	fmt.Println("All examples completed!")
-	fmt.Println("============================================================")
-}
-
-func streamTradesExample(endpoint string) {
-	fmt.Println()
-	fmt.Println("============================================================")
-	fmt.Println("EXAMPLE 1: Streaming Trades")
-	fmt.Println("============================================================")
-
-	stream := hyperliquid.NewGRPCStream(endpoint, nil)
 	tradeCount := 0
+
+	stream := sdk.NewGRPCStream(&hyperliquid.GRPCStreamConfig{
+		Secure:    true,
+		Reconnect: false,
+		OnConnect: func() {
+			fmt.Println("[CONNECTED]")
+		},
+		OnError: func(err error) {
+			fmt.Printf("[ERROR] %v\n", err)
+		},
+	})
 
 	stream.Trades([]string{"BTC", "ETH"}, func(data map[string]any) {
 		tradeCount++
+		coin := data["coin"]
+		px := data["px"]
+		sz := data["sz"]
 		side := "BUY "
 		if data["side"] == "A" {
 			side = "SELL"
 		}
-		fmt.Printf("[%s] %s %s %s @ $%s\n",
-			time.Now().Format("15:04:05.000"),
-			side, data["sz"], data["coin"], data["px"])
+		fmt.Printf("[%s] %s %v %v @ $%v\n", timestamp(), side, sz, coin, px)
+
+		if tradeCount >= 5 {
+			fmt.Printf("\nReceived %d trades.\n", tradeCount)
+		}
 	})
 
 	fmt.Println("Subscribing to BTC and ETH trades...")
-	fmt.Println("------------------------------------------------------------")
 
 	if err := stream.Start(); err != nil {
-		fmt.Printf("Failed to start stream: %v\n", err)
+		fmt.Printf("Start error: %v\n", err)
 		return
 	}
 
-	time.Sleep(10 * time.Second)
+	start := time.Now()
+	for tradeCount < 5 && time.Since(start) < 15*time.Second {
+		time.Sleep(100 * time.Millisecond)
+	}
 	stream.Stop()
-	fmt.Printf("Total trades received: %d\n", tradeCount)
-}
 
-func streamL2BookExample(endpoint string) {
-	fmt.Println()
-	fmt.Println("============================================================")
-	fmt.Println("EXAMPLE 2: Streaming L2 Order Book (Aggregated)")
-	fmt.Println("============================================================")
-	fmt.Println()
-	fmt.Println("L2 book aggregates orders at each price level.")
-	fmt.Println("Use nSigFigs to control price aggregation precision.")
-	fmt.Println()
+	// Example 2: Stream L2 Book
+	fmt.Println("\nExample 2: Streaming L2 Order Book")
+	fmt.Println(string(repeat('-', 60)))
 
-	stream := hyperliquid.NewGRPCStream(endpoint, nil)
-	updateCount := 0
+	l2Count := 0
 
-	stream.L2Book("BTC", func(data map[string]any) {
-		updateCount++
-		if updateCount <= 3 {
-			bids, _ := data["bids"].([]any)
-			asks, _ := data["asks"].([]any)
-			fmt.Printf("[%s] BTC L2 Book:\n", time.Now().Format("15:04:05.000"))
-			if len(bids) > 0 {
-				bid := bids[0].([]any)
-				fmt.Printf("  Best Bid: $%s x %s\n", bid[0], bid[1])
-			}
-			if len(asks) > 0 {
-				ask := asks[0].([]any)
-				fmt.Printf("  Best Ask: $%s x %s\n", ask[0], ask[1])
-			}
-			fmt.Printf("  Levels: %d bids, %d asks\n\n", len(bids), len(asks))
+	l2Stream := sdk.NewGRPCStream(&hyperliquid.GRPCStreamConfig{
+		Secure:    true,
+		Reconnect: false,
+	})
+
+	l2Stream.L2Book("ETH", func(data map[string]any) {
+		l2Count++
+		bids, _ := data["bids"].([][]any)
+		asks, _ := data["asks"].([][]any)
+		if len(bids) > 0 && len(asks) > 0 {
+			fmt.Printf("[%s] ETH: %d bids, %d asks\n", timestamp(), len(bids), len(asks))
 		}
-	}, hyperliquid.L2BookNSigFigs(5)) // nSigFigs=5 for full precision
 
-	fmt.Println("Subscribing to BTC L2 book via gRPC (nSigFigs=5)...")
-	fmt.Println("------------------------------------------------------------")
+		if l2Count >= 3 {
+			fmt.Printf("\nReceived %d L2 updates.\n", l2Count)
+		}
+	}, hyperliquid.L2BookNLevels(10))
 
-	if err := stream.Start(); err != nil {
-		fmt.Printf("Failed to start stream: %v\n", err)
+	if err := l2Stream.Start(); err != nil {
+		fmt.Printf("Start error: %v\n", err)
 		return
 	}
 
-	time.Sleep(10 * time.Second)
-	stream.Stop()
-	fmt.Printf("Total L2 updates received: %d\n", updateCount)
+	start = time.Now()
+	for l2Count < 3 && time.Since(start) < 10*time.Second {
+		time.Sleep(100 * time.Millisecond)
+	}
+	l2Stream.Stop()
+
+	// Example 3: Stream Blocks
+	fmt.Println("\nExample 3: Streaming Blocks")
+	fmt.Println(string(repeat('-', 60)))
+
+	blockCount := 0
+
+	blockStream := sdk.NewGRPCStream(&hyperliquid.GRPCStreamConfig{
+		Secure:    true,
+		Reconnect: false,
+	})
+
+	blockStream.Blocks(func(data map[string]any) {
+		blockCount++
+		// Block data contains the full block info from DataJson
+		fmt.Printf("[%s] Block received\n", timestamp())
+
+		if blockCount >= 3 {
+			fmt.Printf("\nReceived %d blocks.\n", blockCount)
+		}
+	})
+
+	if err := blockStream.Start(); err != nil {
+		fmt.Printf("Start error: %v\n", err)
+		return
+	}
+
+	start = time.Now()
+	for blockCount < 3 && time.Since(start) < 15*time.Second {
+		time.Sleep(100 * time.Millisecond)
+	}
+	blockStream.Stop()
+
+	fmt.Println("\n" + string(repeat('=', 60)))
+	fmt.Println("Done!")
 }
 
-func truncate(s string, n int) string {
-	if len(s) <= n {
-		return s
+func timestamp() string {
+	return time.Now().Format("15:04:05.000")
+}
+
+func repeat(b byte, n int) []byte {
+	result := make([]byte, n)
+	for i := range result {
+		result[i] = b
 	}
-	return s[:n]
+	return result
 }

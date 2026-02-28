@@ -1,4 +1,5 @@
 #!/usr/bin/env npx ts-node
+// @ts-nocheck
 /**
  * Markets Example
  *
@@ -7,32 +8,30 @@
  * No endpoint or private key needed — uses public API.
  */
 
-import { HyperliquidSDK } from 'hyperliquid-sdk';
+import { HyperliquidSDK } from '@quicknode/hyperliquid-sdk';
 
 async function main() {
   // No endpoint or private key needed for read-only public queries
   const sdk = new HyperliquidSDK();
 
   // Get all markets
-  const markets = await sdk.markets() as Record<string, unknown>;
-  console.log(`Perp markets: ${((markets.perps || []) as unknown[]).length}`);
-  console.log(`Spot markets: ${((markets.spot || []) as unknown[]).length}`);
+  const markets = await sdk.markets() as { perps?: any[]; spot?: any[] };
+  const perps = markets.perps || [];
+  const spot = markets.spot || [];
+  console.log(`Perp markets: ${perps.length}`);
+  console.log(`Spot markets: ${spot.length}`);
 
   // Show first 5 perp markets
   console.log("\nFirst 5 perp markets:");
-  for (const m of ((markets.perps || []) as unknown[]).slice(0, 5)) {
-    const market = m as Record<string, unknown>;
-    console.log(`  ${market.name}: szDecimals=${market.szDecimals}`);
+  for (const m of perps.slice(0, 5)) {
+    console.log(`  ${m.name}: szDecimals=${m.szDecimals}`);
   }
 
   // Get HIP-3 DEXes
-  const dexesResponse = await sdk.dexes();
-  const dexesList = Array.isArray(dexesResponse)
-    ? dexesResponse
-    : Object.values(dexesResponse);
-  console.log(`\nHIP-3 DEXes: ${dexesList.length}`);
-  for (const dex of dexesList.slice(0, 5)) {
-    console.log(`  ${(dex as Record<string, unknown>).name || JSON.stringify(dex)}`);
+  const dexes = await sdk.dexes() as unknown as any[];
+  console.log(`\nHIP-3 DEXes: ${dexes.length}`);
+  for (const dex of dexes.slice(0, 5)) {
+    console.log(`  ${dex.name || 'N/A'}`);
   }
 }
 

@@ -1,10 +1,8 @@
-module github.com/quiknode-labs/raptor/hyperliquid-examples/go
+module github.com/quiknode-labs/hyperliquid-examples/go
 
 go 1.22
 
-toolchain go1.23.0
-
-require github.com/quiknode-labs/raptor/hyperliquid-sdk/go v0.0.0
+require github.com/quiknode-labs/hyperliquid-sdk/go v0.1.3
 
 require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
@@ -19,5 +17,3 @@ require (
 	google.golang.org/grpc v1.69.0 // indirect
 	google.golang.org/protobuf v1.35.2 // indirect
 )
-
-replace github.com/quiknode-labs/raptor/hyperliquid-sdk/go => ../../hyperliquid-sdk/go

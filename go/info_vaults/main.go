@@ -1,77 +1,97 @@
-// Vaults & Delegation Example
+// Info Vaults Example — Query vault information and user delegations.
 //
-// Shows how to query vault information and user delegations.
-//
-// Setup:
-//     go build
-//
-// Usage:
-//     export ENDPOINT="https://your-endpoint.hype-mainnet.quiknode.pro/YOUR_TOKEN"
-//     export USER_ADDRESS="0x..."  # Optional
-//     ./info_vaults
+// This example matches the Python info_vaults.py exactly.
 package main
 
 import (
 	"fmt"
-	"log"
 	"os"
+	"strconv"
 
-	"github.com/quiknode-labs/raptor/hyperliquid-sdk/go/hyperliquid"
+	"github.com/quiknode-labs/hyperliquid-sdk/go/hyperliquid"
 )
 
 func main() {
-	endpoint := os.Getenv("ENDPOINT")
+	endpoint := os.Getenv("QUICKNODE_ENDPOINT")
 	if endpoint == "" {
-		endpoint = os.Getenv("QUICKNODE_ENDPOINT")
+		endpoint = os.Getenv("ENDPOINT")
 	}
-	user := os.Getenv("USER_ADDRESS")
+	userAddress := os.Getenv("USER_ADDRESS")
 
 	if endpoint == "" {
-		fmt.Println("Set ENDPOINT environment variable")
+		fmt.Println("Info Vaults Example")
+		fmt.Println("==================================================")
+		fmt.Println()
+		fmt.Println("Usage:")
+		fmt.Println("  export QUICKNODE_ENDPOINT='https://YOUR-ENDPOINT.quiknode.pro/TOKEN'")
+		fmt.Println("  export USER_ADDRESS='0x...'  # Optional, for delegation info")
+		fmt.Println("  go run main.go")
 		os.Exit(1)
 	}
 
+	fmt.Println("Info Vaults Example")
+	fmt.Println("==================================================")
+
 	sdk, err := hyperliquid.New(endpoint)
 	if err != nil {
-		log.Fatalf("Failed to create SDK: %v", err)
+		fmt.Printf("Failed to create SDK: %v\n", err)
+		os.Exit(1)
 	}
 	info := sdk.Info()
 
-	fmt.Println("==================================================")
-	fmt.Println("Vaults & Delegation")
-	fmt.Println("==================================================")
-
-	// Vault summaries
-	fmt.Println("\n1. Vault Summaries:")
+	// Get vault summaries
+	fmt.Println()
+	fmt.Println("Vault Summaries")
+	fmt.Println("------------------------------")
 	vaults, err := info.VaultSummaries()
 	if err != nil {
-		fmt.Printf("   Error: %v\n", err)
+		fmt.Printf("Error: %v\n", err)
 	} else {
-		fmt.Printf("   Total: %d\n", len(vaults))
-		for i, v := range vaults {
-			if i >= 3 {
+		fmt.Printf("Total vaults: %d\n", len(vaults))
+		for i, vault := range vaults {
+			if i >= 5 {
+				fmt.Printf("  ... and %d more\n", len(vaults)-5)
 				break
 			}
-			vault := v.(map[string]any)
-			fmt.Printf("   - %s: TVL $%v\n", vault["name"], vault["tvl"])
+			v := vault.(map[string]any)
+			name, _ := v["name"].(string)
+			tvl := "?"
+			if summary, ok := v["summary"].(map[string]any); ok {
+				if tvlStr, ok := summary["tvl"].(string); ok {
+					tvlFloat, _ := strconv.ParseFloat(tvlStr, 64)
+					tvl = fmt.Sprintf("$%.2f", tvlFloat)
+				}
+			}
+			fmt.Printf("  %s - TVL: %s\n", name, tvl)
 		}
 	}
 
-	// User delegations
-	if user != "" {
-		fmt.Printf("\n2. Delegations (%s...):\n", user[:10])
-		delegations, err := info.Delegations(user)
+	// Get user delegations (if user address provided)
+	if userAddress != "" {
+		fmt.Println()
+		fmt.Println("User Delegations")
+		fmt.Println("------------------------------")
+		fmt.Printf("User: %s\n", userAddress)
+
+		delegations, err := info.Delegations(userAddress)
 		if err != nil {
-			fmt.Printf("   Error: %v\n", err)
-		} else if len(delegations) > 0 {
-			fmt.Printf("   %d active\n", len(delegations))
+			fmt.Printf("Error: %v\n", err)
 		} else {
-			fmt.Println("   None")
+			fmt.Printf("Delegations: %d\n", len(delegations))
+			for i, del := range delegations {
+				if i >= 3 {
+					fmt.Printf("  ... and %d more\n", len(delegations)-3)
+					break
+				}
+				d := del.(map[string]any)
+				validator, _ := d["validator"].(string)
+				amount, _ := d["amount"].(string)
+				fmt.Printf("  Validator: %s, Amount: %s\n", validator[:20]+"...", amount)
+			}
 		}
-	} else {
-		fmt.Println("\n(Set USER_ADDRESS for delegation info)")
 	}
 
-	fmt.Println("\n==================================================")
+	fmt.Println()
+	fmt.Println("==================================================")
 	fmt.Println("Done!")
 }

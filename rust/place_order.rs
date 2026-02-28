@@ -1,97 +1,122 @@
-//! Limit Order Example
+//! Place Order Example
 //!
-//! Demonstrates placing limit orders with different time-in-force options.
+//! Place limit orders using various methods.
 //!
 //! # Usage
 //! ```bash
-//! export PRIVATE_KEY=0x...
-//! export ENDPOINT=https://your-endpoint.hype-mainnet.quiknode.pro/TOKEN
+//! export ENDPOINT="https://your-endpoint.hype-mainnet.quiknode.pro/TOKEN"
+//! export PRIVATE_KEY="0x..."
 //! cargo run --example place_order
 //! ```
 
-use hyperliquid_sdk::{HyperliquidSDK, TIF};
+use hyperliquid_sdk::{HyperliquidSDK, Order, TIF};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tracing_subscriber::fmt::init();
-
     let endpoint = std::env::var("ENDPOINT").ok();
+    let private_key = std::env::var("PRIVATE_KEY").ok();
+
+    if endpoint.is_none() || private_key.is_none() {
+        eprintln!("Usage:");
+        eprintln!("  export ENDPOINT='https://your-endpoint.hype-mainnet.quiknode.pro/TOKEN'");
+        eprintln!("  export PRIVATE_KEY='0x...'");
+        eprintln!("  cargo run --example place_order");
+        std::process::exit(1);
+    }
+
+    println!("Place Order Example");
+    println!("{}", "=".repeat(50));
+
     let mut builder = HyperliquidSDK::new();
-    if let Some(ep) = endpoint {
+    if let Some(ep) = &endpoint {
         builder = builder.endpoint(ep);
+    }
+    if let Some(pk) = &private_key {
+        builder = builder.private_key(pk);
     }
     let sdk = builder.build().await?;
 
-    println!("SDK initialized for address: {:?}", sdk.address());
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // GTC (Good-Till-Cancel) Order
-    // ─────────────────────────────────────────────────────────────────────────
-
-    // Place a limit buy order that stays on the book until filled or cancelled
-    println!("\nPlacing GTC limit buy order...");
-    let order = sdk.buy("BTC", 0.001, 50000.0, TIF::Gtc).await?;
-
-    println!("GTC Order result:");
-    println!("  Status: {}", order.status);
-    println!("  OID: {:?}", order.oid);
-    println!("  Price: {:?}", order.price);
-    println!("  Size: {}", order.size);
-
-    if order.is_resting() {
-        println!("  ✓ Order is resting on the book");
-
-        // Cancel the order
-        println!("\nCancelling order...");
-        let cancel_result = order.cancel().await?;
-        println!("Cancel result: {:?}", cancel_result);
+    if let Some(addr) = sdk.address() {
+        println!("Address: {}", addr);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // IOC (Immediate-or-Cancel) Order
-    // ─────────────────────────────────────────────────────────────────────────
+    // Get current price
+    let mid = sdk.get_mid("BTC").await?;
+    println!("\nBTC mid price: ${:.2}", mid);
 
-    // Place an IOC order - fills immediately or cancels
-    println!("\nPlacing IOC limit buy order...");
-    let order = sdk.buy("ETH", 0.1, 2000.0, TIF::Ioc).await?;
-
-    println!("IOC Order result:");
-    println!("  Status: {}", order.status);
-    if order.is_filled() {
-        println!("  ✓ Order filled immediately");
-        println!("  Filled size: {:?}", order.filled_size);
-        println!("  Avg price: {:?}", order.avg_price);
+    // Method 1: Simple buy/sell
+    println!("\n1. Simple Limit Buy (3% below mid):");
+    let buy_price = mid * 0.97;
+    match sdk.buy("BTC", 0.001, buy_price, TIF::Gtc).await {
+        Ok(order) => {
+            println!("   Status: {}", order.status);
+            println!("   OID: {:?}", order.oid);
+            // Cancel the order
+            if let Some(oid) = order.oid {
+                let _ = sdk.cancel(oid, "BTC").await;
+                println!("   (Cancelled)");
+            }
+        }
+        Err(e) => println!("   Error: {}", e),
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // ALO (Add-Liquidity-Only / Post-Only) Order
-    // ─────────────────────────────────────────────────────────────────────────
+    // Method 2: Fluent builder
+    println!("\n2. Fluent Builder Order:");
+    let order = Order::buy("BTC")
+        .size(0.001)
+        .price(buy_price)
+        .gtc();
 
-    // Place an ALO order - rejected if it would cross the spread
-    println!("\nPlacing ALO (post-only) order...");
-    let order = sdk.buy("BTC", 0.001, 40000.0, TIF::Alo).await?;
-
-    println!("ALO Order result:");
-    println!("  Status: {}", order.status);
-    if order.is_resting() {
-        println!("  ✓ Order added to book as maker");
-        let _ = order.cancel().await;
+    match sdk.order(order).await {
+        Ok(result) => {
+            println!("   Status: {}", result.status);
+            println!("   OID: {:?}", result.oid);
+            // Cancel
+            if let Some(oid) = result.oid {
+                let _ = sdk.cancel(oid, "BTC").await;
+                println!("   (Cancelled)");
+            }
+        }
+        Err(e) => println!("   Error: {}", e),
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Sell Orders
-    // ─────────────────────────────────────────────────────────────────────────
+    // Method 3: IOC order
+    println!("\n3. IOC Order (Immediate or Cancel):");
+    let order = Order::buy("BTC")
+        .size(0.001)
+        .price(buy_price)
+        .ioc();
 
-    println!("\nPlacing limit sell order...");
-    let order = sdk.sell("BTC", 0.001, 100000.0, TIF::Gtc).await?;
-
-    println!("Sell Order result:");
-    println!("  Status: {}", order.status);
-    println!("  Side: {}", order.side);
-
-    if order.is_resting() {
-        let _ = order.cancel().await;
+    match sdk.order(order).await {
+        Ok(result) => {
+            println!("   Status: {}", result.status);
+            println!("   Filled: {:?}", result.filled_size);
+        }
+        Err(e) => println!("   Error: {}", e),
     }
+
+    // Method 4: Post-only (ALO)
+    println!("\n4. Post-Only Order (Add Liquidity Only):");
+    let order = Order::buy("BTC")
+        .size(0.001)
+        .price(buy_price)
+        .alo();
+
+    match sdk.order(order).await {
+        Ok(result) => {
+            println!("   Status: {}", result.status);
+            println!("   OID: {:?}", result.oid);
+            // Cancel
+            if let Some(oid) = result.oid {
+                let _ = sdk.cancel(oid, "BTC").await;
+                println!("   (Cancelled)");
+            }
+        }
+        Err(e) => println!("   Error: {}", e),
+    }
+
+    println!("\n{}", "=".repeat(50));
+    println!("Done!");
 
     Ok(())
 }

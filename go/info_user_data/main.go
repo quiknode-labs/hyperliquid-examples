@@ -1,140 +1,149 @@
-// User Account Data Example
+// Info User Data Example — Query user positions, orders, fees, and balances.
 //
-// Shows how to query user positions, orders, and account state.
-//
-// Setup:
-//     go build
-//
-// Usage:
-//     export ENDPOINT="https://your-endpoint.hype-mainnet.quiknode.pro/YOUR_TOKEN"
-//     export USER_ADDRESS="0x..."
-//     ./info_user_data
+// This example matches the Python info_user_data.py exactly.
 package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 
-	"github.com/quiknode-labs/raptor/hyperliquid-sdk/go/hyperliquid"
+	"github.com/quiknode-labs/hyperliquid-sdk/go/hyperliquid"
 )
 
 func main() {
-	endpoint := os.Getenv("ENDPOINT")
+	endpoint := os.Getenv("QUICKNODE_ENDPOINT")
 	if endpoint == "" {
-		endpoint = os.Getenv("QUICKNODE_ENDPOINT")
+		endpoint = os.Getenv("ENDPOINT")
 	}
-	user := os.Getenv("USER_ADDRESS")
-	if user == "" {
-		user = "0x2ba553d9f990a3b66b03b2dc0d030dfc1c061036"
+	userAddress := os.Getenv("USER_ADDRESS")
+	if userAddress == "" {
+		userAddress = "0xB228634b61636ADF82501eD196Bec979B6aF4732"
 	}
 
 	if endpoint == "" {
-		fmt.Println("Set ENDPOINT environment variable")
+		fmt.Println("Info User Data Example")
+		fmt.Println("==================================================")
+		fmt.Println()
+		fmt.Println("Usage:")
+		fmt.Println("  export QUICKNODE_ENDPOINT='https://YOUR-ENDPOINT.quiknode.pro/TOKEN'")
+		fmt.Println("  export USER_ADDRESS='0x...'  # Optional")
+		fmt.Println("  go run main.go")
 		os.Exit(1)
 	}
 
+	fmt.Println("Info User Data Example")
+	fmt.Println("==================================================")
+
 	sdk, err := hyperliquid.New(endpoint)
 	if err != nil {
-		log.Fatalf("Failed to create SDK: %v", err)
+		fmt.Printf("Failed to create SDK: %v\n", err)
+		os.Exit(1)
 	}
 	info := sdk.Info()
 
-	fmt.Println("==================================================")
-	fmt.Printf("User Data: %s...\n", user[:10])
-	fmt.Println("==================================================")
+	fmt.Printf("Querying data for: %s\n", userAddress)
 
-	// Clearinghouse state (positions + margin)
-	fmt.Println("\n1. Positions & Margin:")
-	state, err := info.ClearinghouseState(user)
+	// Clearinghouse state (positions and margin)
+	fmt.Println()
+	fmt.Println("Clearinghouse State")
+	fmt.Println("------------------------------")
+	state, err := info.ClearinghouseState(userAddress)
 	if err != nil {
-		fmt.Printf("   (clearinghouse_state not available: %v)\n", err)
+		fmt.Printf("Error: %v\n", err)
 	} else {
-		margin, _ := state["marginSummary"].(map[string]any)
-		fmt.Printf("   Account Value: $%s\n", margin["accountValue"])
-		fmt.Printf("   Margin Used: $%s\n", margin["totalMarginUsed"])
+		if marginSummary, ok := state["marginSummary"].(map[string]any); ok {
+			if accountValue, ok := marginSummary["accountValue"].(string); ok {
+				av, _ := strconv.ParseFloat(accountValue, 64)
+				fmt.Printf("Account Value: $%.2f\n", av)
+			}
+			if totalMarginUsed, ok := marginSummary["totalMarginUsed"].(string); ok {
+				tm, _ := strconv.ParseFloat(totalMarginUsed, 64)
+				fmt.Printf("Margin Used: $%.2f\n", tm)
+			}
+		}
 
-		positions, _ := state["assetPositions"].([]any)
-		if len(positions) > 0 {
-			fmt.Printf("   Positions: %d\n", len(positions))
+		// Positions
+		if positions, ok := state["assetPositions"].([]any); ok {
+			fmt.Printf("Positions: %d\n", len(positions))
 			for i, pos := range positions {
 				if i >= 3 {
+					fmt.Printf("  ... and %d more\n", len(positions)-3)
 					break
 				}
 				p := pos.(map[string]any)
-				position := p["position"].(map[string]any)
-				fmt.Printf("   - %s: %s @ %s\n", position["coin"], position["szi"], position["entryPx"])
+				position, _ := p["position"].(map[string]any)
+				coin, _ := position["coin"].(string)
+				szi, _ := position["szi"].(string)
+				entryPx, _ := position["entryPx"].(string)
+				szFloat, _ := strconv.ParseFloat(szi, 64)
+				pxFloat, _ := strconv.ParseFloat(entryPx, 64)
+				fmt.Printf("  %s: %.4f @ $%.2f\n", coin, szFloat, pxFloat)
 			}
-		} else {
-			fmt.Println("   No positions")
 		}
 	}
 
 	// Open orders
-	fmt.Println("\n2. Open Orders:")
-	orders, err := info.OpenOrders(user)
+	fmt.Println()
+	fmt.Println("Open Orders")
+	fmt.Println("------------------------------")
+	orders, err := info.OpenOrders(userAddress)
 	if err != nil {
-		fmt.Printf("   (open_orders not available: %v)\n", err)
-	} else if len(orders) > 0 {
-		fmt.Printf("   %d orders:\n", len(orders))
-		for i, o := range orders {
+		fmt.Printf("Error: %v\n", err)
+	} else {
+		fmt.Printf("Open orders: %d\n", len(orders))
+		for i, order := range orders {
 			if i >= 3 {
+				fmt.Printf("  ... and %d more\n", len(orders)-3)
 				break
 			}
-			order := o.(map[string]any)
-			side := "BUY"
-			if order["side"] == "A" {
-				side = "SELL"
+			o := order.(map[string]any)
+			coin, _ := o["coin"].(string)
+			side, _ := o["side"].(string)
+			sz, _ := o["sz"].(string)
+			limitPx, _ := o["limitPx"].(string)
+			sideStr := "SELL"
+			if side == "B" {
+				sideStr = "BUY"
 			}
-			fmt.Printf("   - %s: %s %s @ %s\n", order["coin"], side, order["sz"], order["limitPx"])
+			fmt.Printf("  %s %s %s @ %s\n", coin, sideStr, sz, limitPx)
 		}
-	} else {
-		fmt.Println("   No open orders")
 	}
 
 	// User fees
-	fmt.Println("\n3. Fee Structure:")
-	fees, err := info.UserFees(user)
+	fmt.Println()
+	fmt.Println("User Fees")
+	fmt.Println("------------------------------")
+	fees, err := info.UserFees(userAddress)
 	if err != nil {
-		fmt.Printf("   (user_fees not available: %v)\n", err)
+		fmt.Printf("Error: %v\n", err)
 	} else {
-		fmt.Printf("   Maker: %v\n", fees["makerRate"])
-		fmt.Printf("   Taker: %v\n", fees["takerRate"])
+		fmt.Printf("Fee structure: %v\n", fees)
 	}
 
-	// Spot balances
-	fmt.Println("\n4. Spot Balances:")
-	spot, err := info.SpotClearinghouseState(user)
+	// Spot clearinghouse state
+	fmt.Println()
+	fmt.Println("Spot Balances")
+	fmt.Println("------------------------------")
+	spotState, err := info.SpotClearinghouseState(userAddress)
 	if err != nil {
-		fmt.Printf("   (spot_clearinghouse_state not available: %v)\n", err)
+		fmt.Printf("Error: %v\n", err)
 	} else {
-		balances, _ := spot["balances"].([]any)
-		if len(balances) > 0 {
-			for i, b := range balances {
-				if i >= 5 {
+		if balances, ok := spotState["balances"].([]any); ok {
+			fmt.Printf("Spot balances: %d\n", len(balances))
+			for i, bal := range balances {
+				if i >= 3 {
 					break
 				}
-				bal := b.(map[string]any)
-				fmt.Printf("   - %s: %s\n", bal["coin"], bal["total"])
+				b := bal.(map[string]any)
+				coin, _ := b["coin"].(string)
+				total, _ := b["total"].(string)
+				fmt.Printf("  %s: %s\n", coin, total)
 			}
-		} else {
-			fmt.Println("   No spot balances")
 		}
 	}
 
-	fmt.Println("\n==================================================")
+	fmt.Println()
+	fmt.Println("==================================================")
 	fmt.Println("Done!")
-}
-
-func parseFloat(v any) float64 {
-	switch val := v.(type) {
-	case string:
-		f, _ := strconv.ParseFloat(val, 64)
-		return f
-	case float64:
-		return val
-	default:
-		return 0
-	}
 }

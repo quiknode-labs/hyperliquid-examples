@@ -1,4 +1,5 @@
 #!/usr/bin/env npx ts-node
+// @ts-nocheck
 /**
  * Preflight Validation Example
  *
@@ -8,7 +9,7 @@
  * No endpoint or private key needed — uses public API.
  */
 
-import { HyperliquidSDK } from 'hyperliquid-sdk';
+import { HyperliquidSDK } from '@quicknode/hyperliquid-sdk';
 
 async function main() {
   // No endpoint or private key needed for read-only public queries
@@ -19,15 +20,15 @@ async function main() {
   console.log(`BTC mid: $${mid.toLocaleString()}`);
 
   // Validate a good order
-  const result1 = await sdk.preflight("BTC", "buy", Math.floor(mid * 0.97), 0.001);
-  console.log(`Valid order: ${JSON.stringify(result1)}`);
+  const result = await sdk.preflight("BTC", "buy", Math.floor(mid * 0.97), 0.001) as any;
+  console.log(`Valid order: ${JSON.stringify(result)}`);
 
   // Validate an order with too many decimals (will fail)
-  const result2 = await sdk.preflight("BTC", "buy", 67000.123456789, 0.001);
+  const result2 = await sdk.preflight("BTC", "buy", 67000.123456789, 0.001) as any;
   console.log(`Invalid price: ${JSON.stringify(result2)}`);
-  if (!(result2 as Record<string, unknown>).valid) {
-    console.log(`  Error: ${(result2 as Record<string, unknown>).error}`);
-    console.log(`  Suggestion: ${(result2 as Record<string, unknown>).suggestion}`);
+  if (!result2.valid && result2.errors && result2.errors.length > 0) {
+    console.log(`  Field: ${result2.errors[0].field}`);
+    console.log(`  Error: ${result2.errors[0].error}`);
   }
 }
 

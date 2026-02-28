@@ -1,10 +1,11 @@
-//! Builder Fee Example
+//! Builder Fee Example — Manage builder fee approval
 //!
-//! Approve and revoke builder fee permissions.
+//! Shows how to approve, check, and revoke builder fee.
 //!
 //! # Usage
 //! ```bash
-//! export PRIVATE_KEY=0x...
+//! export ENDPOINT="https://your-endpoint.hype-mainnet.quiknode.pro/TOKEN"
+//! export PRIVATE_KEY="0x..."
 //! cargo run --example builder_fee
 //! ```
 
@@ -12,36 +13,56 @@ use hyperliquid_sdk::HyperliquidSDK;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tracing_subscriber::fmt::init();
-
     let endpoint = std::env::var("ENDPOINT").ok();
+    let private_key = std::env::var("PRIVATE_KEY").ok();
 
-    let mut builder = HyperliquidSDK::new();
-    if let Some(ep) = endpoint {
-        builder = builder.endpoint(ep);
+    if endpoint.is_none() || private_key.is_none() {
+        eprintln!("Usage:");
+        eprintln!("  export ENDPOINT='https://your-endpoint.hype-mainnet.quiknode.pro/TOKEN'");
+        eprintln!("  export PRIVATE_KEY='0x...'");
+        eprintln!("  cargo run --example builder_fee");
+        std::process::exit(1);
     }
 
+    println!("Builder Fee Management Example");
+    println!("{}", "=".repeat(50));
+
+    let mut builder = HyperliquidSDK::new();
+    if let Some(ep) = &endpoint {
+        builder = builder.endpoint(ep);
+    }
+    if let Some(pk) = &private_key {
+        builder = builder.private_key(pk);
+    }
     let sdk = builder.build().await?;
 
-    println!("SDK initialized for address: {:?}", sdk.address());
+    if let Some(addr) = sdk.address() {
+        println!("Address: {}", addr);
+    }
 
-    // Check approval status (doesn't require deposit)
-    let status = sdk.approval_status().await?;
-    println!("Approval status: {:?}", status);
+    // Check current status
+    println!("\n1. Current Approval Status:");
+    match sdk.approval_status().await {
+        Ok(status) => println!("   {:?}", status),
+        Err(e) => println!("   Error: {}", e),
+    }
 
-    // Approve builder fee (required before trading via QuickNode)
-    // Note: Requires account to have deposited first
-    // let result = sdk.approve_builder_fee(Some("1%")).await?;
-    // println!("Approve builder fee: {:?}", result);
+    // Approve with custom max fee
+    println!("\n2. Approve Builder Fee (0.5% max):");
+    match sdk.approve_builder_fee(Some("0.5%")).await {
+        Ok(result) => println!("   Approved: {:?}", result),
+        Err(e) => println!("   Error: {}", e),
+    }
 
-    // Revoke builder fee permission
-    // let result = sdk.revoke_builder_fee().await?;
-    // println!("Revoke builder fee: {:?}", result);
+    // Revoke approval (commented to avoid breaking things)
+    // println!("\n3. Revoke Builder Fee:");
+    // match sdk.revoke_builder_fee().await {
+    //     Ok(result) => println!("   Revoked: {:?}", result),
+    //     Err(e) => println!("   Error: {}", e),
+    // }
 
-    println!("\nBuilder fee methods available:");
-    println!("  sdk.approve_builder_fee(max_fee)");
-    println!("  sdk.revoke_builder_fee()");
-    println!("  sdk.approval_status()");
+    println!("\n{}", "=".repeat(50));
+    println!("Done!");
 
     Ok(())
 }

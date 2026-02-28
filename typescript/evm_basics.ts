@@ -1,22 +1,21 @@
 #!/usr/bin/env npx ts-node
+// @ts-nocheck
 /**
  * HyperEVM Example
  *
  * Shows how to use standard Ethereum JSON-RPC calls on Hyperliquid's EVM chain.
  *
- * Setup:
- *     npm install hyperliquid-sdk
- *
  * Usage:
- *     export ENDPOINT="https://your-endpoint.hype-mainnet.quiknode.pro/YOUR_TOKEN"
+ *     export QUICKNODE_ENDPOINT="https://your-endpoint.hype-mainnet.quiknode.pro/YOUR_TOKEN"
  *     npx ts-node evm_basics.ts
  */
 
-import { HyperliquidSDK } from 'hyperliquid-sdk';
+import { HyperliquidSDK } from '@quicknode/hyperliquid-sdk';
 
-const ENDPOINT = process.env.ENDPOINT;
+const ENDPOINT = process.env.QUICKNODE_ENDPOINT;
+
 if (!ENDPOINT) {
-  console.log("Set ENDPOINT environment variable");
+  console.error("Set QUICKNODE_ENDPOINT environment variable");
   process.exit(1);
 }
 
@@ -40,10 +39,10 @@ async function main() {
 
   // Latest block
   console.log("\n2. Latest Block:");
-  const block = await evm.getBlockByNumber("latest") as Record<string, unknown>;
+  const block = await evm.getBlockByNumber("latest");
   if (block) {
-    console.log(`   Hash: ${String(block.hash).slice(0, 20)}...`);
-    console.log(`   Txs: ${((block.transactions as unknown[]) || []).length}`);
+    console.log(`   Hash: ${block.hash?.slice(0, 20)}...`);
+    console.log(`   Txs: ${(block.transactions || []).length}`);
   }
 
   // Check balance

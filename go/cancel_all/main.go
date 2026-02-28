@@ -1,46 +1,75 @@
-// Cancel All Orders Example
+// Cancel All Example — Cancel all open orders globally or for a specific asset.
 //
-// Cancel all open orders, or all orders for a specific asset.
+// This example matches the Python cancel_all.py exactly.
 package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 
-	"github.com/quiknode-labs/raptor/hyperliquid-sdk/go/hyperliquid"
+	"github.com/quiknode-labs/hyperliquid-sdk/go/hyperliquid"
 )
 
 func main() {
 	privateKey := os.Getenv("PRIVATE_KEY")
+	endpoint := os.Getenv("QUICKNODE_ENDPOINT")
+	if endpoint == "" {
+		endpoint = os.Getenv("ENDPOINT")
+	}
+
 	if privateKey == "" {
-		fmt.Println("Set PRIVATE_KEY environment variable")
-		fmt.Println("Example: export PRIVATE_KEY='0x...'")
+		fmt.Println("Cancel All Example")
+		fmt.Println("==================================================")
+		fmt.Println()
+		fmt.Println("Usage:")
+		fmt.Println("  export PRIVATE_KEY='0xYourPrivateKey'")
+		fmt.Println("  export QUICKNODE_ENDPOINT='https://YOUR-ENDPOINT.quiknode.pro/TOKEN'")
+		fmt.Println("  go run main.go")
 		os.Exit(1)
 	}
 
-	sdk, err := hyperliquid.New("", hyperliquid.WithPrivateKey(privateKey))
+	fmt.Println("Cancel All Example")
+	fmt.Println("==================================================")
+
+	sdk, err := hyperliquid.New(endpoint, hyperliquid.WithPrivateKey(privateKey))
 	if err != nil {
-		log.Fatalf("Failed to create SDK: %v", err)
+		fmt.Printf("Failed to create SDK: %v\n", err)
+		os.Exit(1)
 	}
 
-	// Check open orders first (pass empty string to use wallet address)
-	orders, err := sdk.OpenOrders("")
+	fmt.Printf("Address: %s\n", sdk.Address())
+	fmt.Println()
+
+	// Check open orders first
+	fmt.Println("Checking open orders...")
+	ordersResp, err := sdk.OpenOrders("")
 	if err != nil {
-		log.Printf("Failed to get open orders: %v", err)
+		fmt.Printf("Error fetching orders: %v\n", err)
 	} else {
-		orderList, _ := orders["orders"].([]any)
-		fmt.Printf("Open orders: %d\n", len(orderList))
+		orders, _ := ordersResp["orders"].([]any)
+		fmt.Printf("Open orders: %d\n", len(orders))
 	}
+	fmt.Println()
 
-	// Cancel all orders
-	result, err := sdk.CancelAll("")
+	// Cancel all orders for a specific asset (BTC)
+	fmt.Println("Canceling all BTC orders...")
+	result, err := sdk.CancelAll("BTC")
 	if err != nil {
-		fmt.Printf("Cancel all: {\"message\": \"No orders to cancel\"}\n")
+		fmt.Printf("Error: %v\n", err)
 	} else {
-		fmt.Printf("Cancel all: %v\n", result)
+		fmt.Printf("Cancel result: %v\n", result)
 	}
+	fmt.Println()
 
-	// Or cancel just BTC orders:
-	// sdk.CancelAll("BTC")
+	// Cancel all orders globally (uncomment to run)
+	// fmt.Println("Canceling ALL orders...")
+	// result, err = sdk.CancelAll("")
+	// if err != nil {
+	//     fmt.Printf("Error: %v\n", err)
+	// } else {
+	//     fmt.Printf("Cancel result: %v\n", result)
+	// }
+
+	fmt.Println("==================================================")
+	fmt.Println("Done!")
 }

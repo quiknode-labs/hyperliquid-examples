@@ -1,12 +1,10 @@
-//! Market Data Example
+//! Info API Market Data Example
 //!
-//! Shows how to query market metadata, prices, order book, and recent trades.
-//!
-//! The SDK handles all Info API methods automatically.
+//! Fetch comprehensive market data: prices, orderbooks, funding rates.
 //!
 //! # Usage
 //! ```bash
-//! export ENDPOINT=https://your-endpoint.hype-mainnet.quiknode.pro/TOKEN
+//! export ENDPOINT="https://your-endpoint.hype-mainnet.quiknode.pro/TOKEN"
 //! cargo run --example info_market_data
 //! ```
 
@@ -14,106 +12,114 @@ use hyperliquid_sdk::HyperliquidSDK;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tracing_subscriber::fmt::init();
+    let endpoint = std::env::var("ENDPOINT").ok();
 
-    let endpoint = std::env::var("ENDPOINT").expect("Set ENDPOINT environment variable");
+    if endpoint.is_none() {
+        eprintln!("Usage:");
+        eprintln!("  export ENDPOINT='https://your-endpoint.hype-mainnet.quiknode.pro/TOKEN'");
+        eprintln!("  cargo run --example info_market_data");
+        std::process::exit(1);
+    }
 
-    let sdk = HyperliquidSDK::new()
-        .endpoint(&endpoint)
-        .build()
-        .await?;
+    println!("Info API Market Data Example");
+    println!("{}", "=".repeat(50));
 
-    println!("==================================================");
-    println!("Market Data (Info API)");
-    println!("==================================================");
+    let mut builder = HyperliquidSDK::new();
+    if let Some(ep) = &endpoint {
+        builder = builder.endpoint(ep);
+    }
+    let sdk = builder.build().await?;
+    let info = sdk.info();
 
-    // Exchange metadata
-    println!("\n1. Exchange Metadata:");
-    match sdk.info().meta().await {
-        Ok(meta) => {
-            if let Some(universe) = meta.get("universe").and_then(|v| v.as_array()) {
-                println!("   Perp Markets: {}", universe.len());
-                for asset in universe.iter().take(5) {
-                    let name = asset.get("name").and_then(|v| v.as_str()).unwrap_or("?");
-                    let max_lev = asset.get("maxLeverage").and_then(|v| v.as_u64()).unwrap_or(0);
-                    println!("   - {}: max leverage {}x", name, max_lev);
+    // All mid prices
+    println!("\n1. Mid Prices:");
+    match info.all_mids(None).await {
+        Ok(mids) => {
+            let count = mids.as_object().map(|o| o.len()).unwrap_or(0);
+            println!("   Total assets: {}", count);
+
+            // Show a few
+            let assets = ["BTC", "ETH", "SOL", "DOGE"];
+            for asset in &assets {
+                if let Some(mid) = mids.get(*asset).and_then(|v| v.as_str()) {
+                    println!("   {}: ${}", asset, mid);
                 }
             }
         }
-        Err(e) => println!("   (meta not available: {})", e),
+        Err(e) => println!("   Error: {}", e),
     }
 
-    // Spot metadata
-    println!("\n2. Spot Metadata:");
-    match sdk.info().spot_meta().await {
-        Ok(spot) => {
-            if let Some(tokens) = spot.get("tokens").and_then(|v| v.as_array()) {
-                println!("   Spot Tokens: {}", tokens.len());
-            }
-        }
-        Err(e) => println!("   (spot_meta not available: {})", e),
+    // Single mid price
+    println!("\n2. Single Asset Price:");
+    match info.get_mid("BTC").await {
+        Ok(mid) => println!("   BTC mid: ${:.2}", mid),
+        Err(e) => println!("   Error: {}", e),
     }
 
-    // Exchange status
-    println!("\n3. Exchange Status:");
-    match sdk.info().exchange_status().await {
-        Ok(status) => println!("   {:?}", status),
-        Err(e) => println!("   (exchange_status not available: {})", e),
-    }
-
-    // All mid prices
-    println!("\n4. Mid Prices:");
-    match sdk.info().all_mids().await {
-        Ok(mids) => {
-            if let Some(btc) = mids.get("BTC").and_then(|v| v.as_str()).and_then(|s| s.parse::<f64>().ok()) {
-                println!("   BTC: ${:.2}", btc);
-            }
-            if let Some(eth) = mids.get("ETH").and_then(|v| v.as_str()).and_then(|s| s.parse::<f64>().ok()) {
-                println!("   ETH: ${:.2}", eth);
-            }
-        }
-        Err(e) => println!("   (allMids not available: {})", e),
-    }
-
-    // Order book
-    println!("\n5. Order Book (BTC):");
-    match sdk.info().l2_book("BTC").await {
+    // L2 Orderbook
+    println!("\n3. L2 Orderbook (BTC):");
+    match info.l2_book("BTC", None, None).await {
         Ok(book) => {
             if let Some(levels) = book.get("levels").and_then(|v| v.as_array()) {
                 if levels.len() >= 2 {
-                    if let (Some(bids), Some(asks)) = (levels[0].as_array(), levels[1].as_array()) {
-                        if let (Some(best_bid), Some(best_ask)) = (bids.first(), asks.first()) {
-                            let bid_px = best_bid.get("px").and_then(|v| v.as_str()).and_then(|s| s.parse::<f64>().ok()).unwrap_or(0.0);
-                            let ask_px = best_ask.get("px").and_then(|v| v.as_str()).and_then(|s| s.parse::<f64>().ok()).unwrap_or(0.0);
-                            let spread = ask_px - bid_px;
-                            println!("   Best Bid: ${:.2}", bid_px);
-                            println!("   Best Ask: ${:.2}", ask_px);
-                            println!("   Spread: ${:.2}", spread);
+                    println!("   Bids:");
+                    if let Some(bids) = levels[0].as_array() {
+                        for bid in bids.iter().take(3) {
+                            let px = bid.get("px").and_then(|v| v.as_str()).unwrap_or("?");
+                            let sz = bid.get("sz").and_then(|v| v.as_str()).unwrap_or("?");
+                            println!("      {} @ ${}", sz, px);
+                        }
+                    }
+                    println!("   Asks:");
+                    if let Some(asks) = levels[1].as_array() {
+                        for ask in asks.iter().take(3) {
+                            let px = ask.get("px").and_then(|v| v.as_str()).unwrap_or("?");
+                            let sz = ask.get("sz").and_then(|v| v.as_str()).unwrap_or("?");
+                            println!("      {} @ ${}", sz, px);
                         }
                     }
                 }
             }
         }
-        Err(e) => println!("   (l2_book not available: {})", e),
+        Err(e) => println!("   Error: {}", e),
     }
 
-    // Recent trades
-    println!("\n6. Recent Trades (BTC):");
-    match sdk.info().recent_trades("BTC").await {
-        Ok(trades) => {
-            if let Some(arr) = trades.as_array() {
-                for t in arr.iter().take(3) {
-                    let side = if t.get("side").and_then(|v| v.as_str()) == Some("B") { "BUY" } else { "SELL" };
-                    let sz = t.get("sz").and_then(|v| v.as_str()).unwrap_or("?");
-                    let px = t.get("px").and_then(|v| v.as_str()).and_then(|s| s.parse::<f64>().ok()).unwrap_or(0.0);
-                    println!("   {} {} @ ${:.2}", side, sz, px);
+    // Predicted funding rates
+    println!("\n4. Predicted Funding Rates:");
+    match info.predicted_fundings().await {
+        Ok(fundings) => {
+            if let Some(arr) = fundings.as_array() {
+                let btc_funding = arr.iter().find(|f| {
+                    f.get("asset").and_then(|v| v.as_str()) == Some("BTC")
+                });
+                if let Some(btc) = btc_funding {
+                    let rate = btc.get("predictedFunding").and_then(|v| v.as_str()).unwrap_or("?");
+                    println!("   BTC: {} (hourly)", rate);
                 }
             }
         }
-        Err(e) => println!("   (recent_trades not available: {})", e),
+        Err(e) => println!("   Error: {}", e),
     }
 
-    println!("\n==================================================");
+    // Recent trades
+    println!("\n5. Recent Trades (BTC):");
+    match info.recent_trades("BTC").await {
+        Ok(trades) => {
+            if let Some(arr) = trades.as_array() {
+                println!("   Last {} trades:", arr.len().min(5));
+                for trade in arr.iter().take(5) {
+                    let side = trade.get("side").and_then(|v| v.as_str()).unwrap_or("?");
+                    let side_str = if side == "B" { "BUY" } else { "SELL" };
+                    let sz = trade.get("sz").and_then(|v| v.as_str()).unwrap_or("?");
+                    let px = trade.get("px").and_then(|v| v.as_str()).unwrap_or("?");
+                    println!("      {} {} @ ${}", side_str, sz, px);
+                }
+            }
+        }
+        Err(e) => println!("   Error: {}", e),
+    }
+
+    println!("\n{}", "=".repeat(50));
     println!("Done!");
 
     Ok(())
