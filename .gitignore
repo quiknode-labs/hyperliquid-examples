@@ -9,6 +9,10 @@ node_modules/
 
 # Rust
 target/
+Cargo.lock
+
+# Go (stray go.sum in subdirectories)
+go/*/go.sum
 
 # Environment
 .env

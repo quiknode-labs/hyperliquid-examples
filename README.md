@@ -36,14 +36,14 @@ python market_order.py
 cd typescript
 
 # Install dependencies
-npm install
+pnpm install
 
 # Set credentials
 export PRIVATE_KEY="0x..."
 export ENDPOINT="https://your-endpoint.hype-mainnet.quiknode.pro/YOUR_TOKEN"
 
 # Run any example
-npx tsx market_order.ts
+pnpm tsx market_order.ts
 ```
 
 ### Rust
