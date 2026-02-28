@@ -27,8 +27,8 @@ print(f"Wallet: {sdk.address}")
 
 # Transfer spot asset to another address
 # result = sdk.transfer_spot(
-#     destination="0x1234567890123456789012345678901234567890",
 #     token="PURR",  # or token index
+#     destination="0x1234567890123456789012345678901234567890",
 #     amount=100.0
 # )
 # print(f"Spot transfer: {result}")
@@ -43,15 +43,15 @@ print(f"Wallet: {sdk.address}")
 
 # Send asset (generalized transfer)
 # result = sdk.send_asset(
-#     destination="0x1234567890123456789012345678901234567890",
 #     token="USDC",  # or token index
-#     amount="100.0"
+#     amount="100.0",
+#     destination="0x1234567890123456789012345678901234567890"
 # )
 # print(f"Send asset: {result}")
 
 print("Transfer methods available:")
 print("  sdk.transfer_usd(destination, amount)")
-print("  sdk.transfer_spot(destination, token, amount)")
+print("  sdk.transfer_spot(token, destination, amount)")
 print("  sdk.transfer_spot_to_perp(amount)")
 print("  sdk.transfer_perp_to_spot(amount)")
-print("  sdk.send_asset(destination, token, amount)")
+print("  sdk.send_asset(token, amount, destination)")
